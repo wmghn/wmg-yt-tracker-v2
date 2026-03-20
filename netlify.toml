@@ -1,0 +1,39 @@
+# ─── Build ─────────────────────────────────────────────────────────────────────
+[build]
+  command   = "npm run build"
+  publish   = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# ─── Plugin: Next.js SSR/API support ──────────────────────────────────────────
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# ─── Security headers (tất cả routes) ─────────────────────────────────────────
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options              = "DENY"
+    X-Content-Type-Options       = "nosniff"
+    X-XSS-Protection             = "1; mode=block"
+    Referrer-Policy              = "strict-origin-when-cross-origin"
+    Permissions-Policy           = "camera=(), microphone=(), geolocation=(), payment=()"
+    Strict-Transport-Security    = "max-age=31536000; includeSubDomains; preload"
+
+# ─── Cache bất biến cho static assets ─────────────────────────────────────────
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# ─── Không cache API routes ────────────────────────────────────────────────────
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "no-store, no-cache, must-revalidate"
+
+# ─── Scheduled function thay thế Vercel Cron ──────────────────────────────────
+# (cần Netlify Pro hoặc dùng dịch vụ cron ngoài gọi endpoint /api/cron/sync-views)
+# [functions]
+#   directory = "netlify/functions"

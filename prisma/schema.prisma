@@ -1,0 +1,331 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
+
+enum UserRole {
+  DIRECTOR
+  MANAGER
+  STAFF
+}
+
+enum ChannelStatus {
+  PENDING_BKT
+  ACTIVE
+  INACTIVE
+}
+
+enum VideoRole {
+  WRITER
+  EDITOR
+}
+
+enum AssignmentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum Metric {
+  REVENUE
+  VIEWS
+  CPM
+  RPM
+  IMPRESSIONS
+}
+
+// ─────────────────────────────────────────────
+// Models
+// ─────────────────────────────────────────────
+
+model User {
+  id         String   @id @default(uuid())
+  name       String
+  email      String   @unique
+  password   String
+  role       UserRole
+  baseSalary Decimal  @default(0) @db.Decimal(15, 2)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  channelMemberships    ChannelMember[]          @relation("MemberUser")
+  addedMembers          ChannelMember[]          @relation("AddedByUser")
+  managedChannels       Channel[]                @relation("ChannelManager")
+  createdChannels       Channel[]                @relation("ChannelCreator")
+  submittedVideos       Video[]                  @relation("VideoSubmitter")
+  videoRoleAssignments  VideoRoleAssignment[]    @relation("AssignedUser")
+  approvedAssignments   VideoRoleAssignment[]    @relation("ApprovedByUser")
+  weightConfigs         ChannelWeightConfig[]    @relation("WeightConfigCreator")
+  salaryConfigs         SalaryConfig[]           @relation("SalaryConfigUser")
+  createdSalaryConfigs  SalaryConfig[]           @relation("SalaryConfigCreator")
+  lockedPeriods         PayrollPeriod[]          @relation("PeriodLocker")
+  createdPeriods        PayrollPeriod[]          @relation("PeriodCreator")
+  payrollRecords        PayrollRecord[]
+  permissionConfigs     PermissionConfig[]
+
+  @@map("users")
+}
+
+model Channel {
+  id               String        @id @default(uuid())
+  youtubeChannelId String        @unique
+  name             String
+  description      String?
+  status           ChannelStatus @default(PENDING_BKT)
+  managerId        String?
+  oauthTokenId     String?
+  createdBy        String
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // Relations
+  manager      User?                 @relation("ChannelManager", fields: [managerId], references: [id])
+  creator      User                  @relation("ChannelCreator", fields: [createdBy], references: [id])
+  oauthToken   YoutubeOAuthToken?    @relation(fields: [oauthTokenId], references: [id])
+  members      ChannelMember[]
+  videos       Video[]
+  weightConfigs ChannelWeightConfig[]
+
+  @@index([managerId])
+  @@index([status])
+  @@map("channels")
+}
+
+model ChannelMember {
+  id        String   @id @default(uuid())
+  channelId String
+  userId    String
+  addedBy   String
+  joinedAt  DateTime @default(now())
+
+  // Relations
+  channel  Channel @relation(fields: [channelId], references: [id])
+  user     User    @relation("MemberUser", fields: [userId], references: [id])
+  addedByUser User @relation("AddedByUser", fields: [addedBy], references: [id])
+
+  @@unique([channelId, userId])
+  @@index([channelId])
+  @@index([userId])
+  @@map("channel_members")
+}
+
+model Video {
+  id             String    @id @default(uuid())
+  youtubeVideoId String    @unique
+  channelId      String
+  title          String
+  thumbnailUrl   String?
+  publishedAt    DateTime?
+  isActive       Boolean   @default(true)
+  submittedBy    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  channel         Channel               @relation(fields: [channelId], references: [id])
+  submitter       User?                 @relation("VideoSubmitter", fields: [submittedBy], references: [id])
+  roleAssignments     VideoRoleAssignment[]
+  viewsLog            VideoViewsLog[]
+  analyticsSnapshots  AnalyticsSnapshot[]
+
+  @@index([channelId])
+  @@index([submittedBy])
+  @@map("videos")
+}
+
+model VideoRoleAssignment {
+  id         String           @id @default(uuid())
+  videoId    String
+  userId     String
+  role       VideoRole
+  approvedBy String?
+  approvedAt DateTime?
+  status     AssignmentStatus @default(PENDING)
+  createdAt  DateTime         @default(now())
+
+  // Relations
+  video      Video  @relation(fields: [videoId], references: [id])
+  user       User   @relation("AssignedUser", fields: [userId], references: [id])
+  approver   User?  @relation("ApprovedByUser", fields: [approvedBy], references: [id])
+
+  @@unique([videoId, userId, role])
+  @@index([videoId])
+  @@index([userId])
+  @@index([status])
+  @@map("video_role_assignments")
+}
+
+model VideoViewsLog {
+  id              String   @id @default(uuid())
+  videoId         String
+  viewsCount      BigInt
+  revenueEstimate Decimal? @db.Decimal(15, 4)
+  recordedAt      DateTime
+  isForcedUpdate  Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  // Relations
+  video Video @relation(fields: [videoId], references: [id])
+
+  @@index([videoId])
+  @@index([recordedAt])
+  @@map("video_views_log")
+}
+
+model ChannelWeightConfig {
+  id             String    @id @default(uuid())
+  channelId      String
+  role           VideoRole
+  weightPercent  Decimal   @db.Decimal(5, 2)
+  effectiveFrom  DateTime
+  createdBy      String
+  createdAt      DateTime  @default(now())
+
+  // Relations
+  channel Channel @relation(fields: [channelId], references: [id])
+  creator User    @relation("WeightConfigCreator", fields: [createdBy], references: [id])
+
+  @@unique([channelId, role, effectiveFrom])
+  @@index([channelId])
+  @@map("channel_weight_configs")
+}
+
+model SalaryConfig {
+  id                     String   @id @default(uuid())
+  userId                 String
+  baseSalary             Decimal  @db.Decimal(15, 2)
+  bonusPerThousandViews  Decimal  @db.Decimal(15, 4)
+  effectiveFrom          DateTime
+  createdBy              String
+  createdAt              DateTime @default(now())
+
+  // Relations
+  user    User @relation("SalaryConfigUser", fields: [userId], references: [id])
+  creator User @relation("SalaryConfigCreator", fields: [createdBy], references: [id])
+
+  @@index([userId])
+  @@map("salary_configs")
+}
+
+model PayrollPeriod {
+  id        String    @id @default(uuid())
+  month     Int
+  year      Int
+  lockedAt  DateTime?
+  lockedBy  String?
+  createdBy String
+  createdAt DateTime  @default(now())
+
+  // Relations
+  locker  User?          @relation("PeriodLocker", fields: [lockedBy], references: [id])
+  creator User           @relation("PeriodCreator", fields: [createdBy], references: [id])
+  records PayrollRecord[]
+
+  @@unique([month, year])
+  @@map("payroll_periods")
+}
+
+model PayrollRecord {
+  id            String   @id @default(uuid())
+  periodId      String
+  userId        String
+  baseSalary    Decimal  @db.Decimal(15, 2)
+  totalViews    BigInt
+  totalBonus    Decimal  @db.Decimal(15, 2)
+  totalSalary   Decimal  @db.Decimal(15, 2)
+  calculatedAt  DateTime
+  detail        Json
+  createdAt     DateTime @default(now())
+
+  // Relations
+  period PayrollPeriod @relation(fields: [periodId], references: [id])
+  user   User          @relation(fields: [userId], references: [id])
+
+  @@unique([periodId, userId])
+  @@index([periodId])
+  @@index([userId])
+  @@map("payroll_records")
+}
+
+model PermissionConfig {
+  id           String     @id @default(uuid())
+  metric       Metric     @unique
+  allowedRoles UserRole[]
+  createdBy    String
+  updatedAt    DateTime   @updatedAt
+
+  // Relations
+  creator User @relation(fields: [createdBy], references: [id])
+
+  @@map("permission_configs")
+}
+
+model AnalyticsSnapshot {
+  id                       String   @id @default(uuid())
+  videoId                  String
+  startDate                DateTime @db.Date  // range start (e.g. 2026-03-01 for March)
+  date                     DateTime @db.Date  // range end  (e.g. 2026-03-31 for March)
+
+  views                    BigInt   @default(0)
+  estimatedMinutesWatched  Decimal? @db.Decimal(15, 2)
+  averageViewDuration      Decimal? @db.Decimal(10, 2)
+  subscribersGained        Int?
+  impressions              BigInt?
+  impressionCTR            Decimal? @db.Decimal(10, 4)
+  estimatedRevenue         Decimal? @db.Decimal(15, 4)
+  cpm                      Decimal? @db.Decimal(10, 4)
+  likes                    Int?
+  comments                 Int?
+
+  fetchedAt DateTime @default(now())
+
+  video Video @relation(fields: [videoId], references: [id])
+
+  @@unique([videoId, startDate, date])
+  @@index([videoId])
+  @@index([date])
+  @@index([startDate])
+  @@map("analytics_snapshots")
+}
+
+model MetricPermission {
+  id           String     @id @default(uuid())
+  metricKey    String     @unique
+  metricLabel  String
+  allowedRoles UserRole[] @default([DIRECTOR])
+  isDefault    Boolean    @default(false)
+  sortOrder    Int        @default(0)
+  updatedBy    String
+  updatedAt    DateTime   @updatedAt
+
+  @@map("metric_permissions")
+}
+
+model YoutubeOAuthToken {
+  id           String   @id @default(uuid())
+  channelId    String
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  scope        String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  channels Channel[]
+
+  @@index([channelId])
+  @@map("youtube_oauth_tokens")
+}

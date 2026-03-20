@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hướng dẫn Deploy lên Netlify — YT Payroll</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      line-height: 1.7;
+      padding: 0 16px 80px;
+    }
+
+    .container { max-width: 860px; margin: 0 auto; }
+
+    /* Header */
+    .hero {
+      background: linear-gradient(135deg, #1e3a5f 0%, #0f766e 100%);
+      color: white;
+      padding: 48px 40px 40px;
+      margin: 0 -16px 40px;
+      border-radius: 0 0 20px 20px;
+    }
+    .hero h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+    .hero p  { margin-top: 8px; opacity: .85; font-size: 15px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25);
+      border-radius: 99px; padding: 4px 12px; font-size: 12px; font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    /* Nav */
+    .toc {
+      background: white; border: 1px solid #e2e8f0; border-radius: 14px;
+      padding: 20px 24px; margin-bottom: 32px;
+    }
+    .toc h2 { font-size: 13px; font-weight: 700; text-transform: uppercase;
+              letter-spacing: .06em; color: #64748b; margin-bottom: 12px; }
+    .toc ol { padding-left: 20px; }
+    .toc li { margin: 4px 0; }
+    .toc a  { color: #0f766e; text-decoration: none; font-size: 14px; font-weight: 500; }
+    .toc a:hover { text-decoration: underline; }
+
+    /* Sections */
+    .section {
+      background: white; border: 1px solid #e2e8f0; border-radius: 16px;
+      padding: 28px 32px; margin-bottom: 24px;
+    }
+    .section-header {
+      display: flex; align-items: center; gap-10px; gap: 10px;
+      margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #f1f5f9;
+    }
+    .step-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px; border-radius: 50%; background: #0f766e;
+      color: white; font-size: 14px; font-weight: 800; flex-shrink: 0;
+    }
+    h2.section-title { font-size: 18px; font-weight: 700; color: #0f172a; }
+    h3 { font-size: 15px; font-weight: 700; color: #0f172a; margin: 20px 0 8px; }
+    p  { font-size: 14px; color: #374151; margin-bottom: 10px; }
+
+    /* Code blocks */
+    pre {
+      background: #0f172a; color: #e2e8f0; border-radius: 10px;
+      padding: 16px 20px; font-size: 13px; font-family: "SF Mono", "Fira Code", monospace;
+      overflow-x: auto; margin: 12px 0; line-height: 1.6; position: relative;
+    }
+    code {
+      background: #f1f5f9; color: #0f766e; padding: 2px 6px; border-radius: 4px;
+      font-size: 13px; font-family: "SF Mono", "Fira Code", monospace;
+    }
+    pre code { background: none; color: inherit; padding: 0; }
+
+    /* Callout boxes */
+    .callout {
+      border-radius: 10px; padding: 14px 18px; margin: 14px 0;
+      font-size: 13.5px; display: flex; gap: 12px; align-items: flex-start;
+    }
+    .callout-icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+    .callout.warning { background: #fffbeb; border: 1px solid #fcd34d; }
+    .callout.danger  { background: #fef2f2; border: 1px solid #fca5a5; }
+    .callout.info    { background: #eff6ff; border: 1px solid #93c5fd; }
+    .callout.success { background: #f0fdf4; border: 1px solid #86efac; }
+    .callout b { display: block; font-weight: 700; margin-bottom: 3px; }
+
+    /* Env table */
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 12px 0; }
+    th {
+      background: #f8fafc; text-align: left; padding: 10px 14px;
+      font-weight: 700; color: #374151; border-bottom: 2px solid #e2e8f0; font-size: 12px;
+    }
+    td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    .required { color: #dc2626; font-weight: 700; font-size: 11px; }
+    .optional { color: #64748b; font-size: 11px; }
+    .env-key { font-family: "SF Mono", "Fira Code", monospace; color: #0f766e; font-weight: 600; }
+
+    /* Steps list */
+    .steps { list-style: none; padding: 0; counter-reset: step; }
+    .steps li {
+      counter-increment: step; padding: 12px 0 12px 44px; position: relative;
+      border-bottom: 1px dashed #f1f5f9; font-size: 14px;
+    }
+    .steps li:last-child { border-bottom: none; }
+    .steps li::before {
+      content: counter(step); position: absolute; left: 0; top: 12px;
+      width: 26px; height: 26px; background: #0f766e; color: white;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 800;
+    }
+
+    /* Tag */
+    .tag {
+      display: inline-block; padding: 2px 8px; border-radius: 99px;
+      font-size: 11px; font-weight: 700;
+    }
+    .tag.green  { background: #dcfce7; color: #15803d; }
+    .tag.red    { background: #fee2e2; color: #dc2626; }
+    .tag.blue   { background: #dbeafe; color: #1d4ed8; }
+    .tag.yellow { background: #fef9c3; color: #92400e; }
+
+    .divider { border: none; border-top: 1px solid #e2e8f0; margin: 8px 0 16px; }
+
+    footer {
+      text-align: center; font-size: 12px; color: #94a3b8; margin-top: 48px;
+      padding-top: 24px; border-top: 1px solid #e2e8f0;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="badge">📖 Hướng dẫn Deploy</div>
+    <h1>Deploy YT Payroll lên Netlify</h1>
+    <p>Cấu hình bảo mật, thiết lập biến môi trường và các bước chi tiết để go-live an toàn.</p>
+  </div>
+
+  <!-- TOC -->
+  <div class="toc">
+    <h2>Mục lục</h2>
+    <ol>
+      <li><a href="#s1">Cài đặt Netlify CLI &amp; plugin Next.js</a></li>
+      <li><a href="#s2">Kết nối repository GitHub</a></li>
+      <li><a href="#s3">Cấu hình Build Settings</a></li>
+      <li><a href="#s4">Thiết lập Environment Variables (quan trọng nhất)</a></li>
+      <li><a href="#s5">Bảng đầy đủ các biến môi trường</a></li>
+      <li><a href="#s6">Cách tạo SECRET an toàn</a></li>
+      <li><a href="#s7">Cron job / Sync Views</a></li>
+      <li><a href="#s8">Kiểm tra sau khi deploy</a></li>
+      <li><a href="#s9">Checklist bảo mật</a></li>
+    </ol>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="section" id="s1">
+    <div class="section-header">
+      <div class="step-num">1</div>
+      <h2 class="section-title">Cài đặt Netlify CLI &amp; plugin Next.js</h2>
+    </div>
+
+    <p>Plugin <code>@netlify/plugin-nextjs</code> là bắt buộc để Next.js 14 App Router hoạt động đúng trên Netlify (SSR, API Routes, Middleware).</p>
+
+    <h3>Cài plugin vào project</h3>
+    <pre><code>npm install --save-dev @netlify/plugin-nextjs</code></pre>
+
+    <h3>File <code>netlify.toml</code> đã được tạo sẵn trong project</h3>
+    <p>File này đã cấu hình plugin, security headers và cache. Không cần chỉnh thêm.</p>
+
+    <div class="callout info">
+      <span class="callout-icon">ℹ️</span>
+      <div><b>Netlify tự detect plugin</b> — Nếu <code>netlify.toml</code> đã khai báo <code>[[plugins]]</code>, Netlify sẽ tự install khi build. Bạn không cần cài thủ công trên dashboard.</div>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="section" id="s2">
+    <div class="section-header">
+      <div class="step-num">2</div>
+      <h2 class="section-title">Kết nối repository GitHub</h2>
+    </div>
+
+    <ol class="steps">
+      <li>Đăng nhập <strong>app.netlify.com</strong> → nhấn <strong>"Add new site"</strong> → <strong>"Import an existing project"</strong>.</li>
+      <li>Chọn <strong>GitHub</strong> → cấp quyền → chọn repo <code>wmg-yt-tracker-v2</code>.</li>
+      <li>Netlify tự đọc <code>netlify.toml</code> — branch deploy mặc định là <code>main</code>.</li>
+      <li><strong>Chưa nhấn Deploy</strong> — đi đến Bước 4 để điền biến môi trường trước.</li>
+    </ol>
+
+    <div class="callout warning">
+      <span class="callout-icon">⚠️</span>
+      <div><b>Điền env TRƯỚC khi deploy lần đầu</b> — Nếu build chạy mà thiếu <code>DATABASE_URL</code> hay <code>NEXTAUTH_SECRET</code>, app sẽ crash.</div>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="section" id="s3">
+    <div class="section-header">
+      <div class="step-num">3</div>
+      <h2 class="section-title">Cấu hình Build Settings</h2>
+    </div>
+
+    <p>Netlify tự đọc từ <code>netlify.toml</code>, nhưng hãy kiểm tra lại trên dashboard:</p>
+
+    <table>
+      <tr><th>Trường</th><th>Giá trị</th></tr>
+      <tr><td>Base directory</td><td><em>(để trống)</em></td></tr>
+      <tr><td>Build command</td><td><code>npm run build</code></td></tr>
+      <tr><td>Publish directory</td><td><code>.next</code></td></tr>
+      <tr><td>Node version</td><td><code>20</code> (set trong netlify.toml)</td></tr>
+    </table>
+
+    <div class="callout success">
+      <span class="callout-icon">✅</span>
+      <div>Nếu thấy Netlify tự điền đúng từ file <code>netlify.toml</code> — không cần sửa gì thêm.</div>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="section" id="s4">
+    <div class="section-header">
+      <div class="step-num">4</div>
+      <h2 class="section-title">Thiết lập Environment Variables <span class="tag red">Quan trọng nhất</span></h2>
+    </div>
+
+    <h3>Cách vào trang Environment Variables</h3>
+    <ol class="steps">
+      <li>Trên dashboard Netlify, chọn site của bạn.</li>
+      <li>Menu bên trái: <strong>Site configuration</strong> → <strong>Environment variables</strong>.</li>
+      <li>Nhấn <strong>"Add a variable"</strong> → chọn <strong>"Add a single variable"</strong>.</li>
+      <li>Điền <strong>Key</strong> và <strong>Value</strong> → nhấn <strong>"Save"</strong>.</li>
+      <li>Lặp lại cho từng biến trong bảng ở Bước 5.</li>
+    </ol>
+
+    <div class="callout danger">
+      <span class="callout-icon">🔴</span>
+      <div>
+        <b>KHÔNG BAO GIỜ làm những điều này:</b>
+        <ul style="padding-left:18px; margin-top:6px;">
+          <li>Commit file <code>.env</code> hoặc <code>.env.production</code> lên Git</li>
+          <li>Dán secret vào <code>netlify.toml</code> (file này đã ở trong repo)</li>
+          <li>Chia sẻ <code>NEXTAUTH_SECRET</code> hay <code>DATABASE_URL</code> qua Slack/email dạng plain text</li>
+          <li>Dùng chung secret giữa môi trường dev và production</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Scope phù hợp cho từng biến</h3>
+    <p>Netlify cho phép chọn scope: <span class="tag green">Production</span> <span class="tag blue">Deploy Previews</span> <span class="tag yellow">Branch deploys</span> <span class="tag blue">Local development</span>.</p>
+    <p>→ Với các secret nhạy cảm (<code>DATABASE_URL</code>, <code>NEXTAUTH_SECRET</code>, <code>ENCRYPTION_KEY</code>), chỉ chọn <span class="tag green">Production</span> để không lộ ra preview branches.</p>
+
+    <div class="callout info">
+      <span class="callout-icon">💡</span>
+      <div><b>Tip:</b> Dùng database riêng cho production (Supabase project khác hoặc Neon branch khác). Không bao giờ để dev và production dùng chung DB.</div>
+    </div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="section" id="s5">
+    <div class="section-header">
+      <div class="step-num">5</div>
+      <h2 class="section-title">Bảng đầy đủ các biến môi trường</h2>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:220px">Key</th>
+          <th>Giá trị / Mô tả</th>
+          <th style="width:80px">Bắt buộc</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <tr><td colspan="3" style="background:#f8fafc; font-weight:700; font-size:12px; color:#64748b; padding:8px 14px;">🔐 DATABASE</td></tr>
+
+        <tr>
+          <td><span class="env-key">DATABASE_URL</span></td>
+          <td>
+            Connection string Supabase/Neon dạng pooler:<br>
+            <code>postgresql://user:password@host:6543/db?pgbouncer=true&sslmode=require</code><br>
+            <em style="font-size:12px;color:#64748b">Dùng pooler URL (port 6543) cho runtime, KHÔNG dùng direct URL ở đây.</em>
+          </td>
+          <td><span class="required">Bắt buộc</span></td>
+        </tr>
+
+        <tr>
+          <td><span class="env-key">DIRECT_URL</span></td>
+          <td>
+            Direct connection (không qua pgBouncer):<br>
+            <code>postgresql://user:password@host:5432/db?sslmode=require</code><br>
+            <em style="font-size:12px;color:#64748b">Chỉ dùng cho Prisma Migrate (nếu chạy migration từ CI/CD).</em>
+          </td>
+          <td><span class="optional">Nên có</span></td>
+        </tr>
+
+        <tr><td colspan="3" style="background:#f8fafc; font-weight:700; font-size:12px; color:#64748b; padding:8px 14px;">🔑 NEXTAUTH / SESSION</td></tr>
+
+        <tr>
+          <td><span class="env-key">NEXTAUTH_SECRET</span></td>
+          <td>
+            Chuỗi ngẫu nhiên 32+ ký tự dùng để ký JWT session.<br>
+            Xem Bước 6 để tạo an toàn.<br>
+            <em style="font-size:12px;color:#64748b">Ví dụ: <code>a8f3d2e1c9b7...</code> (64 hex chars)</em>
+          </td>
+          <td><span class="required">Bắt buộc</span></td>
+        </tr>
+
+        <tr>
+          <td><span class="env-key">NEXTAUTH_URL</span></td>
+          <td>
+            URL public của site trên Netlify:<br>
+            <code>https://ten-site-cua-ban.netlify.app</code><br>
+            Hoặc custom domain: <code>https://yourdomain.com</code><br>
+            <em style="font-size:12px;color:#64748b">⚠️ Phải khớp chính xác với URL thực — không có dấu / cuối.</em>
+          </td>
+          <td><span class="required">Bắt buộc</span></td>
+        </tr>
+
+        <tr><td colspan="3" style="background:#f8fafc; font-weight:700; font-size:12px; color:#64748b; padding:8px 14px;">📺 YOUTUBE API</td></tr>
+
+        <tr>
+          <td><span class="env-key">YOUTUBE_API_KEY</span></td>
+          <td>
+            API Key từ Google Cloud Console (YouTube Data API v3).<br>
+            <em style="font-size:12px;color:#64748b">Vào Google Cloud → APIs &amp; Services → Credentials → Create API Key. Restrict key: chỉ cho YouTube Data API v3 và HTTP referrer là domain Netlify của bạn.</em>
+          </td>
+          <td><span class="required">Bắt buộc</span></td>
+        </tr>
+
+        <tr>
+          <td><span class="env-key">YOUTUBE_CLIENT_ID</span></td>
+          <td>OAuth 2.0 Client ID (YouTube Analytics API — xem views theo ngày).</td>
+          <td><span class="optional">Nếu dùng</span></td>
+        </tr>
+
+        <tr>
+          <td><span class="env-key">YOUTUBE_CLIENT_SECRET</span></td>
+          <td>OAuth 2.0 Client Secret tương ứng.</td>
+          <td><span class="optional">Nếu dùng</span></td>
+        </tr>
+
+        <tr><td colspan="3" style="background:#f8fafc; font-weight:700; font-size:12px; color:#64748b; padding:8px 14px;">🛡️ BẢO MẬT</td></tr>
+
+        <tr>
+          <td><span class="env-key">ENCRYPTION_KEY</span></td>
+          <td>
+            Hex string 32 bytes (64 ký tự hex) dùng để mã hoá OAuth token lưu DB.<br>
+            Xem Bước 6 để tạo.<br>
+            <em style="font-size:12px;color:#64748b">Ví dụ: <code>a1b2c3d4e5f6...</code> (64 hex)</em>
+          </td>
+          <td><span class="required">Bắt buộc</span></td>
+        </tr>
+
+        <tr>
+          <td><span class="env-key">CRON_SECRET</span></td>
+          <td>
+            Token bí mật để bảo vệ endpoint <code>/api/cron/sync-views</code>.<br>
+            Request phải gửi header: <code>Authorization: Bearer &lt;CRON_SECRET&gt;</code><br>
+            Xem Bước 6 để tạo.
+          </td>
+          <td><span class="required">Bắt buộc</span></td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <!-- STEP 6 -->
+  <div class="section" id="s6">
+    <div class="section-header">
+      <div class="step-num">6</div>
+      <h2 class="section-title">Cách tạo SECRET an toàn</h2>
+    </div>
+
+    <div class="callout danger">
+      <span class="callout-icon">🔴</span>
+      <div><b>KHÔNG dùng các chuỗi tự gõ như <code>mysecret123</code></b> — phải dùng random generator.</div>
+    </div>
+
+    <h3>Tạo <code>NEXTAUTH_SECRET</code></h3>
+    <p>Chạy lệnh này trên terminal (máy local hoặc bất kỳ máy nào có Node/OpenSSL):</p>
+    <pre><code># Cách 1 — OpenSSL (khuyến nghị)
+openssl rand -base64 32
+
+# Cách 2 — Node.js
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+# Cách 3 — Online (chỉ dùng khi trust site)
+# https://generate-secret.vercel.app/32</code></pre>
+
+    <h3>Tạo <code>ENCRYPTION_KEY</code> (64 hex chars)</h3>
+    <pre><code># OpenSSL
+openssl rand -hex 32
+
+# Node.js
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"</code></pre>
+
+    <h3>Tạo <code>CRON_SECRET</code></h3>
+    <pre><code>openssl rand -base64 24</code></pre>
+
+    <div class="callout warning">
+      <span class="callout-icon">⚠️</span>
+      <div>
+        <b>Lưu trữ secrets an toàn:</b>
+        <ul style="padding-left:18px; margin-top:6px;">
+          <li>Dùng <strong>1Password</strong>, <strong>Bitwarden</strong> hoặc <strong>Notion (private, encrypted)</strong> để lưu.</li>
+          <li>Không lưu trong Google Docs, Slack, hay ghi chú điện thoại không có mã hoá.</li>
+          <li>Sau khi điền vào Netlify, xoá khỏi lịch sử terminal: <code>history -c</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 7 -->
+  <div class="section" id="s7">
+    <div class="section-header">
+      <div class="step-num">7</div>
+      <h2 class="section-title">Cron Job — Tự động Sync Views</h2>
+    </div>
+
+    <p>Project đang dùng <strong>Vercel Cron</strong> (<code>vercel.json</code>) để tự gọi <code>/api/cron/sync-views</code> mỗi 2 ngày. Netlify <strong>không hỗ trợ Vercel Cron</strong>, có 2 lựa chọn thay thế:</p>
+
+    <h3>Lựa chọn 1 — Dùng cron-job.org (Miễn phí, đơn giản)</h3>
+    <ol class="steps">
+      <li>Đăng ký tại <strong>cron-job.org</strong> (miễn phí).</li>
+      <li>Tạo job mới: URL = <code>https://ten-site.netlify.app/api/cron/sync-views</code></li>
+      <li>Schedule: <code>0 2 */2 * *</code> (2 giờ sáng, mỗi 2 ngày).</li>
+      <li>Thêm header: <code>Authorization: Bearer &lt;CRON_SECRET&gt;</code></li>
+    </ol>
+
+    <h3>Lựa chọn 2 — GitHub Actions (Miễn phí, có log rõ ràng)</h3>
+    <p>Tạo file <code>.github/workflows/sync-views.yml</code>:</p>
+    <pre><code>name: Sync Views
+on:
+  schedule:
+    - cron: "0 2 */2 * *"   # 02:00 UTC mỗi 2 ngày
+  workflow_dispatch:          # Cho phép chạy thủ công
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call sync endpoint
+        run: |
+          curl -f -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://ten-site.netlify.app/api/cron/sync-views</code></pre>
+    <p>Vào <strong>GitHub repo → Settings → Secrets → Actions</strong> → thêm secret <code>CRON_SECRET</code>.</p>
+
+    <div class="callout info">
+      <span class="callout-icon">ℹ️</span>
+      <div><b>Khuyến nghị:</b> GitHub Actions vì có log đầy đủ, dễ debug, miễn phí 2000 phút/tháng trên repo public/private.</div>
+    </div>
+  </div>
+
+  <!-- STEP 8 -->
+  <div class="section" id="s8">
+    <div class="section-header">
+      <div class="step-num">8</div>
+      <h2 class="section-title">Kiểm tra sau khi Deploy</h2>
+    </div>
+
+    <ol class="steps">
+      <li>Vào <code>https://ten-site.netlify.app/login</code> → đăng nhập với tài khoản Director.</li>
+      <li>Kiểm tra menu: Quản lý Kênh, Nhân sự, Thống kê — phải load được.</li>
+      <li>Mở DevTools → tab <strong>Network</strong> → gọi 1 API (ví dụ <code>/api/analytics/staff-analytics</code>) → response phải là JSON, không phải lỗi 500.</li>
+      <li>Kiểm tra security headers: mở <code>https://securityheaders.com</code> → nhập URL site → phải đạt <strong>grade A</strong> trở lên.</li>
+      <li>Kiểm tra SSL: URL phải bắt đầu bằng <code>https://</code> và không có cảnh báo certificate.</li>
+      <li>Test cron endpoint thủ công:<br>
+        <code>curl -H "Authorization: Bearer &lt;CRON_SECRET&gt;" https://ten-site.netlify.app/api/cron/sync-views</code>
+      </li>
+    </ol>
+
+    <h3>Nếu build thất bại</h3>
+    <p>Vào <strong>Netlify dashboard → Deploys → [deploy thất bại] → Deploy log</strong> để xem lỗi chi tiết.</p>
+    <p>Lỗi thường gặp:</p>
+    <table>
+      <tr><th>Lỗi</th><th>Nguyên nhân &amp; Fix</th></tr>
+      <tr>
+        <td><code>Environment variable not found: DATABASE_URL</code></td>
+        <td>Chưa thêm biến vào Netlify. Vào Site configuration → Environment variables → thêm lại → Redeploy.</td>
+      </tr>
+      <tr>
+        <td><code>Prisma Client is not generated</code></td>
+        <td>Thêm script: <code>"build": "prisma generate &amp;&amp; next build"</code> vào <code>package.json</code>.</td>
+      </tr>
+      <tr>
+        <td><code>NEXTAUTH_URL is not set</code></td>
+        <td>Thêm biến <code>NEXTAUTH_URL</code> với URL chính xác của Netlify site.</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- STEP 9 -->
+  <div class="section" id="s9">
+    <div class="section-header">
+      <div class="step-num">9</div>
+      <h2 class="section-title">Checklist Bảo Mật ✅</h2>
+    </div>
+
+    <p>Trước khi share link site cho người dùng, kiểm tra lại:</p>
+
+    <table>
+      <thead>
+        <tr><th>Hạng mục</th><th>Trạng thái</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>File <code>.env</code> không có trong Git (<code>git log --all -- .env</code> phải trống)</td>
+          <td><span class="tag green">✓ Đã cấu hình trong .gitignore</span></td>
+        </tr>
+        <tr>
+          <td><code>NEXTAUTH_SECRET</code> là chuỗi random ≥ 32 ký tự, khác với dev</td>
+          <td>□ Kiểm tra thủ công</td>
+        </tr>
+        <tr>
+          <td><code>NEXTAUTH_URL</code> trỏ đúng URL production (không phải localhost)</td>
+          <td>□ Kiểm tra thủ công</td>
+        </tr>
+        <tr>
+          <td>Database production riêng biệt, không dùng chung với dev</td>
+          <td>□ Kiểm tra thủ công</td>
+        </tr>
+        <tr>
+          <td>YouTube API Key đã restrict: chỉ cho domain Netlify của bạn</td>
+          <td>□ Kiểm tra trên Google Cloud Console</td>
+        </tr>
+        <tr>
+          <td>Endpoint <code>/api/cron/sync-views</code> yêu cầu header <code>Authorization</code></td>
+          <td><span class="tag green">✓ Đã có trong code</span></td>
+        </tr>
+        <tr>
+          <td>Security headers được trả về (X-Frame-Options, HSTS...)</td>
+          <td><span class="tag green">✓ Đã cấu hình trong netlify.toml</span></td>
+        </tr>
+        <tr>
+          <td>Header <code>X-Powered-By: Next.js</code> đã bị ẩn</td>
+          <td><span class="tag green">✓ Đã tắt trong next.config.mjs</span></td>
+        </tr>
+        <tr>
+          <td>HTTPS bắt buộc (Netlify tự bật)</td>
+          <td><span class="tag green">✓ Netlify tự cấp SSL</span></td>
+        </tr>
+        <tr>
+          <td>Secrets được lưu trong password manager, không trong ghi chú tự do</td>
+          <td>□ Kiểm tra thủ công</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout success">
+      <span class="callout-icon">🎉</span>
+      <div><b>Hoàn tất!</b> Sau khi checklist đủ, site đã sẵn sàng cho người dùng thực.</div>
+    </div>
+  </div>
+
+  <footer>
+    <p>YT Payroll Platform — Tài liệu nội bộ • Không chia sẻ ra ngoài</p>
+  </footer>
+
+</div>
+</body>
+</html>
