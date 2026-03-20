@@ -81,9 +81,9 @@ export async function POST(req: Request) {
     }
 
     // Validate all IDs
-    const validIds = [...new Set(
+    const validIds = Array.from(new Set(
       newIds.map((s) => s.trim()).filter((s) => /^[A-Za-z0-9_-]{11}$/.test(s))
-    )];
+    ));
 
     // Current videos submitted by this user for this channel that have the current role assignment
     type VideoRow = { id: string; youtubeVideoId: string };

@@ -81,7 +81,7 @@ export async function syncAnalyticsSnapshots(
       const metaMap = new Map(allMetadata.map((m) => [m.youtubeVideoId, m]));
 
       // Update existing video titles/thumbnails
-      for (const [ytId, internalId] of ytToInternal.entries()) {
+      for (const [ytId, internalId] of Array.from(ytToInternal.entries())) {
         const meta = metaMap.get(ytId);
         if (!meta) continue;
         try {
