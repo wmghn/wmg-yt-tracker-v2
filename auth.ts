@@ -7,6 +7,8 @@ import { db } from "./lib/db";
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
   ...authConfig,
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  trustHost: true,
   providers: [
     Credentials({
       credentials: {
