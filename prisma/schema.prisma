@@ -300,6 +300,21 @@ model AnalyticsSnapshot {
   @@map("analytics_snapshots")
 }
 
+model SyncJob {
+  id         String   @id @default(uuid())
+  status     String   @default("pending") // pending | running | done | error
+  channelIds String[] // empty = all channels
+  dateRange  String
+  month      Int?
+  year       Int?
+  result     Json?    // SyncResult khi done
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([status])
+  @@map("sync_jobs")
+}
+
 model MetricPermission {
   id           String     @id @default(uuid())
   metricKey    String     @unique

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, DragEvent } from "react";
 import {
   Upload, Pencil, Trash2, Plus, ChevronUp, ChevronDown, RefreshCw, X,
-  FileSpreadsheet, BarChart3, Users,
+  FileSpreadsheet, BarChart3, Users, Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateRangeDropdown, type DateRangeValue } from "@/components/analytics/date-range-dropdown";
@@ -608,6 +608,34 @@ function AnalyticsSection({ summaries }: { summaries: PersonSummaryRow[] }) {
   );
 }
 
+// ─── XLSX export ───────────────────────────────────────────────────────────────
+
+function exportPersonsXlsx(persons: LocalPerson[], channelId: string) {
+  const header = ["Tên nhân sự", "Vai trò", "Số video", "Video IDs"];
+  const rows = persons.map((p) => [
+    p.name,
+    p.role === "WRITER" ? "content" : "editor",
+    p.videoIds.length,
+    p.videoIds.join(" "),
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+
+  // Column widths
+  ws["!cols"] = [
+    { wch: 24 }, // Tên nhân sự
+    { wch: 10 }, // Vai trò
+    { wch: 10 }, // Số video
+    { wch: 80 }, // Video IDs
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Nhân sự");
+
+  const ts = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `nhan-su-${channelId}-${ts}.xlsx`);
+}
+
 // ─── Main export ───────────────────────────────────────────────────────────────
 
 const DEFAULT_DATE_RANGE: DateRangeValue = { type: "28days", label: "28 ngày qua" };
@@ -755,14 +783,27 @@ export function LocalTeamManager({ channelId }: Props) {
         </div>
 
         {activeTab === "manage" && (
-          <Button
-            onClick={() => setActiveTab("analytics")}
-            size="sm"
-            className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <BarChart3 className="h-3.5 w-3.5" />
-            Xem phân tích views
-          </Button>
+          <div className="flex items-center gap-2">
+            {persons.length > 0 && (
+              <Button
+                onClick={() => exportPersonsXlsx(persons, channelId)}
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Xuất Excel
+              </Button>
+            )}
+            <Button
+              onClick={() => setActiveTab("analytics")}
+              size="sm"
+              className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+              Xem phân tích views
+            </Button>
+          </div>
         )}
       </div>
 

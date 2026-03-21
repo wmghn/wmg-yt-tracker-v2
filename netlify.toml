@@ -33,7 +33,6 @@
   [headers.values]
     Cache-Control = "no-store, no-cache, must-revalidate"
 
-# ─── Scheduled function thay thế Vercel Cron ──────────────────────────────────
-# (cần Netlify Pro hoặc dùng dịch vụ cron ngoài gọi endpoint /api/cron/sync-views)
-# [functions]
-#   directory = "netlify/functions"
+# ─── Netlify Functions (bao gồm background functions) ─────────────────────────
+[functions]
+  directory = "netlify/functions"

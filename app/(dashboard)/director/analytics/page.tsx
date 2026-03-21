@@ -24,6 +24,7 @@ import { ChannelDropdown } from "@/components/analytics/channel-dropdown";
 import { VideoIdCell } from "@/components/analytics/video-id-cell";
 import { TeamMemberSection } from "@/components/analytics/team-member-section";
 import { LocalTeamManager } from "@/components/analytics/local-team-manager";
+import { SampleExportPanel } from "@/components/analytics/sample-export-panel";
 import { resolveDateRange, type DateRangeType } from "@/lib/youtube/analytics-api";
 
 interface Channel {
@@ -435,7 +436,18 @@ function DirectorAnalyticsContent() {
 
           {/* Local team manager — paste video IDs & analyse */}
           <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-zinc-900">Quản lý nhân sự & Video IDs</h2>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <h2 className="text-sm font-semibold text-zinc-900">Quản lý nhân sự & Video IDs</h2>
+              {selectedChannel && data.topVideos.length > 0 && (
+                <SampleExportPanel
+                  videos={data.topVideos.map((v) => ({
+                    youtubeVideoId: v._youtubeVideoId ?? v.youtubeVideoId,
+                    title: v.title,
+                  }))}
+                  channelId={selectedChannel}
+                />
+              )}
+            </div>
             <LocalTeamManager channelId={selectedChannel} />
           </div>
         </>
