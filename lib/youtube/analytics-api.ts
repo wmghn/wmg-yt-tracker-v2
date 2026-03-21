@@ -236,13 +236,20 @@ export class YouTubeAnalyticsAPI {
    */
   async getChannelVideoViews(
     accessToken: string,
-    dateRange: DateRange
+    dateRange: DateRange,
+    youtubeChannelId?: string
   ): Promise<Array<{ ytVideoId: string } & AnalyticsMetrics>> {
+    // Use the specific channel ID when provided (required for brand channels).
+    // Falling back to "MINE" only works for the main personal channel.
+    const channelFilter = youtubeChannelId
+      ? `channel==${youtubeChannelId}`
+      : "channel==MINE";
+
     const fetchPage = async (
       pageToken?: string
     ): Promise<{ rows: (string | number)[][]; colHeaders: string[]; nextPageToken?: string }> => {
       const params = new URLSearchParams({
-        ids: "channel==MINE",
+        ids: channelFilter,
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
         metrics: "views,estimatedMinutesWatched",

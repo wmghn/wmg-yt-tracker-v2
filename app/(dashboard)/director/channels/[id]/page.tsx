@@ -40,7 +40,7 @@ export default async function DirectorChannelDetailPage({ params, searchParams }
           orderBy: { effectiveFrom: "desc" },
         },
         oauthToken: {
-          select: { id: true, expiresAt: true, scope: true, updatedAt: true },
+          select: { id: true, expiresAt: true, scope: true, updatedAt: true, ytChannelId: true, ytChannelName: true },
         },
         _count: { select: { videos: true, members: true } },
       },
@@ -169,6 +169,8 @@ export default async function DirectorChannelDetailPage({ params, searchParams }
             connectedAt={channel.oauthToken?.updatedAt.toISOString() ?? null}
             expiresAt={channel.oauthToken?.expiresAt.toISOString() ?? null}
             scope={channel.oauthToken?.scope ?? null}
+            ytChannelId={channel.oauthToken?.ytChannelId ?? null}
+            ytChannelName={channel.oauthToken?.ytChannelName ?? null}
             errorParam={searchParams.error ?? null}
             successParam={searchParams.success === "1"}
           />

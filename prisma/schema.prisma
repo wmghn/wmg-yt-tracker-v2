@@ -314,14 +314,16 @@ model MetricPermission {
 }
 
 model YoutubeOAuthToken {
-  id           String   @id @default(uuid())
-  channelId    String
-  accessToken  String
-  refreshToken String
-  expiresAt    DateTime
-  scope        String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(uuid())
+  channelId      String
+  accessToken    String
+  refreshToken   String
+  expiresAt      DateTime
+  scope          String
+  ytChannelId    String?  // YouTube channel ID authorized (e.g. UC...)
+  ytChannelName  String?  // YouTube channel name (e.g. "Wiloke Learning")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations
   channels Channel[]

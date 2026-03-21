@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { BarChart3, Eye, Clock, RefreshCw } from "lucide-react";
 import { ChannelDropdown } from "@/components/analytics/channel-dropdown";
-import { LocalTeamManager } from "@/components/analytics/local-team-manager";
+import { StaffVideoTracker } from "@/components/analytics/staff-video-tracker";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -187,13 +187,11 @@ function StaffAnalyticsContent() {
             </div>
           </div>
 
-          {/* Local team manager */}
+          {/* Staff video tracker */}
           {channelId && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-zinc-900">Quản lý nhân sự & Video IDs</h2>
-              </div>
-              <LocalTeamManager channelId={channelId} />
+              <h2 className="text-sm font-semibold text-zinc-900">Video IDs của bạn</h2>
+              <StaffVideoTracker channelId={channelId} />
             </div>
           )}
         </>

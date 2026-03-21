@@ -11,6 +11,8 @@ interface Props {
   connectedAt?: string | null;      // ISO string của updatedAt
   expiresAt?: string | null;
   scope?: string | null;
+  ytChannelId?: string | null;      // YouTube channel ID được authorize (UC...)
+  ytChannelName?: string | null;    // Tên kênh YouTube được authorize
   errorParam?: string | null;       // từ URL ?error=...
   successParam?: boolean;           // từ URL ?success=1
 }
@@ -32,6 +34,8 @@ export function YoutubeOAuthCard({
   connectedAt,
   expiresAt,
   scope,
+  ytChannelId,
+  ytChannelName,
   errorParam,
   successParam,
 }: Props) {
@@ -119,6 +123,20 @@ export function YoutubeOAuthCard({
         {/* Details khi đã kết nối */}
         {isConnected && (
           <div className="mt-4 space-y-2 border-t pt-4">
+            {/* Kênh YouTube được authorize */}
+            {(ytChannelName || ytChannelId) && (
+              <div className="flex justify-between text-xs items-start gap-2">
+                <span className="text-zinc-500 shrink-0">Kênh được kết nối</span>
+                <div className="text-right">
+                  {ytChannelName && (
+                    <p className="font-semibold text-zinc-800">{ytChannelName}</p>
+                  )}
+                  {ytChannelId && (
+                    <p className="font-mono text-zinc-400">{ytChannelId}</p>
+                  )}
+                </div>
+              </div>
+            )}
             {connectedAt && (
               <div className="flex justify-between text-xs">
                 <span className="text-zinc-500">Cập nhật lần cuối</span>

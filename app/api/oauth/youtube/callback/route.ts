@@ -98,15 +98,33 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(`${redirectBase}?tab=oauth&error=channel_not_found`);
     }
 
+    // Fetch the authorized YouTube channel name and ID (best-effort)
+    let ytChannelId: string | null = null;
+    let ytChannelName: string | null = null;
+    try {
+      const ytRes = await fetch(
+        "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true",
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (ytRes.ok) {
+        const ytData = await ytRes.json();
+        const item = ytData.items?.[0];
+        if (item) {
+          ytChannelId = item.id as string;
+          ytChannelName = item.snippet?.title as string ?? null;
+        }
+      }
+    } catch { /* non-fatal */ }
+
     // Upsert token
     if (channel.oauthTokenId) {
       await db.youtubeOAuthToken.update({
         where: { id: channel.oauthTokenId },
-        data: { accessToken, refreshToken, expiresAt, scope },
+        data: { accessToken, refreshToken, expiresAt, scope, ytChannelId, ytChannelName },
       });
     } else {
       const newToken = await db.youtubeOAuthToken.create({
-        data: { channelId, accessToken, refreshToken, expiresAt, scope },
+        data: { channelId, accessToken, refreshToken, expiresAt, scope, ytChannelId, ytChannelName },
       });
       await db.channel.update({
         where: { id: channelId },

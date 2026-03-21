@@ -42,7 +42,7 @@ export async function syncAnalyticsSnapshots(
       ...(channelIds.length > 0 ? { id: { in: channelIds } } : {}),
       oauthTokenId: { not: null },
     },
-    select: { id: true, name: true },
+    select: { id: true, name: true, youtubeChannelId: true },
   });
 
   if (channels.length === 0) {
@@ -60,8 +60,13 @@ export async function syncAnalyticsSnapshots(
     }
 
     try {
-      // Fetch total views per video for the date range (dimensions=video, aggregated)
-      const rows = await youtubeAnalyticsAPI.getChannelVideoViews(accessToken, dateRange);
+      // Fetch total views per video for the date range (dimensions=video, aggregated).
+      // Pass the stored YouTube channel ID so brand channels are queried correctly.
+      const rows = await youtubeAnalyticsAPI.getChannelVideoViews(
+        accessToken,
+        dateRange,
+        channel.youtubeChannelId ?? undefined
+      );
 
       if (rows.length === 0) continue;
 
