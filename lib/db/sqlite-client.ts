@@ -12,8 +12,9 @@
  *   - Parse JSON strings thành arrays sau khi read
  */
 
-import { PrismaClient } from "../generated/prisma-sqlite";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+// Không dùng static import để TypeScript không cần resolve path lúc type-check
+// File này chỉ được require() khi DB_PROVIDER=sqlite (local dev)
+import type { PrismaClient } from "@prisma/client";
 
 // Mapping: model → fields cần serialize/deserialize
 const ARRAY_FIELDS: Record<string, string[]> = {
@@ -55,10 +56,15 @@ function deserializeFields(model: string, data: Record<string, unknown>) {
 }
 
 function createSqliteClient() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { PrismaClient: SQLitePrismaClient } = require("../generated/prisma-sqlite");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { PrismaBetterSqlite3 } = require("@prisma/adapter-better-sqlite3");
+
   const url = (process.env.DATABASE_URL ?? "file:./local.db").replace(/^file:/, "");
   const adapter = new PrismaBetterSqlite3({ url });
 
-  const client = new PrismaClient({
+  const client = new SQLitePrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
@@ -112,7 +118,7 @@ function createSqliteClient() {
   }) as unknown as PrismaClient;
 }
 
-const globalForSqlite = globalThis as unknown as { sqliteClient?: PrismaClient };
+const globalForSqlite = globalThis as unknown as { sqliteClient?: PrismaClient; };
 
 export const sqliteDb =
   globalForSqlite.sqliteClient ?? createSqliteClient();
