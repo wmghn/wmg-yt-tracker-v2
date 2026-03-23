@@ -1,7 +1,3 @@
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig = {
   eslint: {
@@ -25,14 +21,6 @@ const nextConfig = {
   // Next.js 14 dùng experimental.serverComponentsExternalPackages (Next.js 15+ đổi thành serverExternalPackages)
   experimental: {
     serverComponentsExternalPackages: ["otpauth", "qrcode", "better-sqlite3", "@prisma/adapter-better-sqlite3", "jose"],
-  },
-  webpack: (config) => {
-    // Khi không dùng SQLite (Netlify/Vercel), thay sqlite-client bằng empty module
-    // → webpack không cần resolve ../generated/prisma-sqlite hay better-sqlite3
-    if (process.env.DB_PROVIDER !== "sqlite") {
-      config.resolve.alias[path.resolve(__dirname, "lib/db/sqlite-client")] = false;
-    }
-    return config;
   },
 };
 
