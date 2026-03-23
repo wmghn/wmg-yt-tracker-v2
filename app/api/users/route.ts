@@ -16,11 +16,12 @@ export async function GET() {
       email: string;
       role: string;
       isActive: boolean;
+      twoFactorEnabled: boolean;
       createdAt: Date;
     };
 
     const users: UserRow[] = await db.$queryRaw`
-      SELECT id, name, email, role, "isActive", "createdAt"
+      SELECT id, name, email, role, "isActive", "twoFactorEnabled", "createdAt"
       FROM users
       WHERE role != 'DIRECTOR'
       ORDER BY "createdAt" DESC`;

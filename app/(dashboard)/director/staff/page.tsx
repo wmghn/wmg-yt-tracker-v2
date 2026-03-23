@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Users, RefreshCw, Plus, Loader2, Shield, UserCheck, ToggleLeft, ToggleRight } from "lucide-react";
+import { Users, RefreshCw, Plus, Loader2, Shield, UserCheck, ToggleLeft, ToggleRight, ShieldCheck, ShieldOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,6 +27,7 @@ interface StaffUser {
   email: string;
   role: "MANAGER" | "STAFF";
   isActive: boolean;
+  twoFactorEnabled: boolean;
   createdAt: string;
 }
 
@@ -269,6 +270,7 @@ function Section({
                 <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">Email</th>
                 <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">Quyền</th>
                 <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">Trạng thái</th>
+                <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">2FA</th>
                 <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">Ngày tạo</th>
                 <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">Thao tác</th>
               </tr>
@@ -309,6 +311,11 @@ function Section({
                         </>
                       )}
                     </button>
+                  </td>
+                  <td className="px-5 py-3">
+                    {u.twoFactorEnabled
+                      ? <span title="2FA đang bật" className="flex items-center gap-1 text-xs text-emerald-600 font-medium"><ShieldCheck className="h-4 w-4" />Bật</span>
+                      : <span title="2FA chưa bật" className="flex items-center gap-1 text-xs text-zinc-400"><ShieldOff className="h-4 w-4" />Tắt</span>}
                   </td>
                   <td className="px-5 py-3 text-zinc-400 text-xs">
                     {new Date(u.createdAt).toLocaleDateString("vi-VN")}

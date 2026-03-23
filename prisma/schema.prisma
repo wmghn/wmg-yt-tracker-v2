@@ -55,9 +55,11 @@ model User {
   password   String
   role       UserRole
   baseSalary Decimal  @default(0) @db.Decimal(15, 2)
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  isActive         Boolean  @default(true)
+  twoFactorEnabled Boolean  @default(false)
+  twoFactorSecret  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   // Relations
   channelMemberships    ChannelMember[]          @relation("MemberUser")

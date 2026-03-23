@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { TwoFactorSettings } from "@/components/auth/two-factor-settings";
 import {
   Tv2,
   Users,
@@ -49,6 +51,14 @@ type Props = {
 export function Sidebar({ user }: Props) {
   const pathname = usePathname();
   const navItems = NAV_ITEMS[user.role] ?? [];
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/users/me", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setTwoFactorEnabled(d.twoFactorEnabled === true))
+      .catch(() => {});
+  }, []);
   const initials = (user.name ?? user.email ?? "U")
     .split(" ")
     .map((w) => w[0])
@@ -96,7 +106,12 @@ export function Sidebar({ user }: Props) {
       </nav>
 
       {/* User footer */}
-      <div className="border-t p-3">
+      <div className="border-t p-3 space-y-1">
+        <TwoFactorSettings
+          enabled={twoFactorEnabled}
+          onEnabledChange={setTwoFactorEnabled}
+          variant="sidebar"
+        />
         <div className="flex items-center gap-3 rounded-md px-2 py-2">
           <Avatar className="h-8 w-8">
             <AvatarFallback className="bg-zinc-200 text-zinc-700 text-xs font-semibold">

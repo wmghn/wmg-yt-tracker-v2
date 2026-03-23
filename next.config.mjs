@@ -18,6 +18,8 @@ const nextConfig = {
   },
   // Ẩn header X-Powered-By: Next.js
   poweredByHeader: false,
+  // Không bundle các package Node.js native để tránh lỗi ESM/CJS
+  serverExternalPackages: ["otpauth", "qrcode"],
 };
 
 export default nextConfig;

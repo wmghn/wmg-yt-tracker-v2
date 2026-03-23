@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { authConfig } from "./auth.config";
 import { db } from "./lib/db";
+import { verifyTOTP } from "./lib/totp";
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -14,6 +15,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        totpCode: { label: "Mã 2FA", type: "text" },
       },
       async authorize(credentials) {
         try {
@@ -31,6 +33,12 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
           );
           if (!isValid) return null;
 
+          // Kiểm tra 2FA nếu đã bật
+          if (user.twoFactorEnabled && user.twoFactorSecret) {
+            const code = (credentials.totpCode as string | undefined)?.replace(/\s/g, "") ?? "";
+            if (!code || !verifyTOTP(code, user.twoFactorSecret)) return null;
+          }
+
           return {
             id: user.id,
             name: user.name,
@@ -38,7 +46,6 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
             role: user.role as string,
           };
         } catch {
-          // Do not log — exceptions here may expose credentials or stack traces
           return null;
         }
       },

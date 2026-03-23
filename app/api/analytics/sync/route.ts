@@ -57,10 +57,9 @@ export async function POST(req: Request) {
     });
 
     const internalSecret = process.env.INTERNAL_SYNC_SECRET;
-    const isNetlify = !!process.env.NETLIFY;
-
+    const isNetlify = process.env.IS_NETLIFY === "true";
+console.log(isNetlify, "isNetlify")
     if (isNetlify) {
-      // Production: fire Netlify Background Function (không await)
       if (!internalSecret) {
         return NextResponse.json({ error: "INTERNAL_SYNC_SECRET chưa được cấu hình" }, { status: 500 });
       }
