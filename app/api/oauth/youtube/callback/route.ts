@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { verifyOAuthState } from "@/lib/youtube/oauth-state";
+import { encrypt } from "@/lib/crypto";
 
 /**
  * GET /api/oauth/youtube/callback?code=...&state=<signed>
@@ -118,15 +119,17 @@ export async function GET(req: NextRequest) {
       }
     } catch { /* non-fatal */ }
 
-    // Upsert token
+    // Upsert token — mã hoá trước khi lưu
+    const encryptedAccess = encrypt(accessToken);
+    const encryptedRefresh = encrypt(refreshToken);
     if (channel.oauthTokenId) {
       await db.youtubeOAuthToken.update({
         where: { id: channel.oauthTokenId },
-        data: { accessToken, refreshToken, expiresAt, scope, ytChannelId, ytChannelName },
+        data: { accessToken: encryptedAccess, refreshToken: encryptedRefresh, expiresAt, scope, ytChannelId, ytChannelName },
       });
     } else {
       const newToken = await db.youtubeOAuthToken.create({
-        data: { channelId, accessToken, refreshToken, expiresAt, scope, ytChannelId, ytChannelName },
+        data: { channelId, accessToken: encryptedAccess, refreshToken: encryptedRefresh, expiresAt, scope, ytChannelId, ytChannelName },
       });
       await db.channel.update({
         where: { id: channelId },

@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { encrypt, decrypt } from "@/lib/crypto";
 
 /**
  * Returns a valid access token for the given channel.
@@ -23,14 +24,17 @@ export async function getValidAccessToken(channelId: string): Promise<string | n
   const token = channel?.oauthToken;
   if (!token) return null;
 
+  const accessToken = decrypt(token.accessToken);
+  const refreshToken = decrypt(token.refreshToken);
+
   // Still valid with 60-second buffer
   const bufferMs = 60 * 1000;
   if (token.expiresAt.getTime() - Date.now() > bufferMs) {
-    return token.accessToken;
+    return accessToken;
   }
 
   // Token expired — refresh it
-  return refreshAccessToken(token.id, token.refreshToken);
+  return refreshAccessToken(token.id, refreshToken);
 }
 
 async function refreshAccessToken(tokenId: string, refreshToken: string): Promise<string | null> {
@@ -60,7 +64,7 @@ async function refreshAccessToken(tokenId: string, refreshToken: string): Promis
 
     await db.youtubeOAuthToken.update({
       where: { id: tokenId },
-      data: { accessToken: newAccessToken, expiresAt: newExpiresAt },
+      data: { accessToken: encrypt(newAccessToken), expiresAt: newExpiresAt },
     });
 
     return newAccessToken;
