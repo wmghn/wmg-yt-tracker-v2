@@ -104,8 +104,9 @@ export async function fetchVideoMetadataBatch(
       title: d.title,
       thumbnailUrl: d.thumbnailUrl || undefined,
     }));
-  } catch {
-    // If Data API fails (no key, quota), return stubs so sync still works
+  } catch (err) {
+    // If Data API fails (no key, quota, key restriction), return stubs so sync still works
+    console.error("[fetchVideoMetadataBatch] YouTube Data API error:", err);
     return youtubeVideoIds.map((id) => ({ youtubeVideoId: id, title: id }));
   }
 }

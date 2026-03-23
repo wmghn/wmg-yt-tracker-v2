@@ -65,14 +65,10 @@ export default async function handler() {
     return new Response("skipped:disabled", { status: 200 });
   }
 
-  // ── Check hour ──────────────────────────────────────────────────────────────
-  if (utcHour !== config.runHour) {
-    console.log(`[cron-analytics] UTC hour ${utcHour} ≠ configured ${config.runHour} — skip`);
-    // Không log skip theo giờ — xảy ra mỗi giờ, quá nhiều
-    return new Response("skipped:wrong_hour", { status: 200 });
-  }
-
   // ── Check frequency (min hours between runs) ────────────────────────────────
+  const TEST_FREQUENCIES = new Set(["every5min", "every30min", "hourly"]);
+  const isTestFrequency = TEST_FREQUENCIES.has(config.frequency);
+
   const minHoursMap: Record<string, number> = {
     // Test options
     every5min:  0.08,
@@ -84,6 +80,12 @@ export default async function handler() {
     weekly:     164,
   };
   const minHours = minHoursMap[config.frequency] ?? 20;
+
+  // ── Check hour (only for non-test frequencies) ──────────────────────────────
+  if (!isTestFrequency && utcHour !== config.runHour) {
+    console.log(`[cron-analytics] UTC hour ${utcHour} ≠ configured ${config.runHour} — skip`);
+    return new Response("skipped:wrong_hour", { status: 200 });
+  }
 
   if (config.lastRunAt) {
     const hoursSince = (now.getTime() - new Date(config.lastRunAt).getTime()) / 3_600_000;
@@ -166,7 +168,9 @@ export default async function handler() {
   return new Response(JSON.stringify(result), { status: 200 });
 }
 
-// Fire every hour — DB config decides whether to actually run
+// Fire every 5 minutes — DB config decides whether to actually run.
+// Test frequencies (every5min, every30min, hourly) rely on this interval.
+// Production frequencies (daily, every2days, weekly) use the runHour gate above.
 export const config: Config = {
-  schedule: "0 * * * *",
+  schedule: "*/5 * * * *",
 };
