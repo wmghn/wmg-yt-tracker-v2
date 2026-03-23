@@ -6,8 +6,6 @@ import { ViewsLineChart } from "@/components/analytics/views-line-chart";
 import { TopChannelsBarChart } from "@/components/analytics/top-channels-bar-chart";
 
 function formatNumber(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
   return n.toLocaleString("vi-VN");
 }
 

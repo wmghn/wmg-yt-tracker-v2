@@ -5,8 +5,6 @@ import { KpiCard } from "@/components/analytics/kpi-card";
 import { Sparkline } from "@/components/analytics/sparkline";
 
 function formatNumber(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
   return n.toLocaleString("vi-VN");
 }
 
