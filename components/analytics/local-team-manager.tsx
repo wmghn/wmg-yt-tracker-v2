@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, DragEvent } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, DragEvent } from "react";
 import {
   Upload, Pencil, Trash2, Plus, ChevronUp, ChevronDown, RefreshCw, X,
   FileSpreadsheet, BarChart3, Users, Download,
@@ -96,26 +96,26 @@ function avatarColor(index: number): string {
   return AVATAR_COLORS[index % AVATAR_COLORS.length];
 }
 
-// ─── Local storage helpers ──────────────────────────────────────────────────────
+// ─── DB-backed helpers ─────────────────────────────────────────────────────────
 
-function storageKey(channelId: string): string {
-  return `local-team-v1-${channelId}`;
-}
-
-function loadPersons(channelId: string): LocalPerson[] {
+async function loadPersonsFromDB(channelId: string): Promise<LocalPerson[]> {
   try {
-    const raw = localStorage.getItem(storageKey(channelId));
-    if (!raw) return [];
-    return JSON.parse(raw) as LocalPerson[];
+    const res = await fetch(`/api/channels/${channelId}/tracker`);
+    if (!res.ok) return [];
+    const json = await res.json();
+    return (json.data ?? []) as LocalPerson[];
   } catch {
     return [];
   }
 }
 
-function savePersons(channelId: string, persons: LocalPerson[]): void {
-  try {
-    localStorage.setItem(storageKey(channelId), JSON.stringify(persons));
-  } catch { /* non-fatal */ }
+function savePersonsToDB(channelId: string, persons: LocalPerson[]): void {
+  // fire-and-forget, debounced by caller
+  fetch(`/api/channels/${channelId}/tracker`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data: persons }),
+  }).catch(() => { /* non-fatal */ });
 }
 
 // ─── XLSX import helpers ────────────────────────────────────────────────────────
@@ -294,12 +294,14 @@ function PersonCard({
   person,
   index,
   weights,
+  isMe,
   onEdit,
   onDelete,
 }: {
   person: LocalPerson;
   index: number;
   weights: Record<string, number>;
+  isMe?: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -312,7 +314,7 @@ function PersonCard({
       : "border-purple-300 bg-purple-50 text-purple-700";
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white shadow-sm p-4 flex items-start gap-3">
+    <div className={`rounded-xl border bg-white shadow-sm p-4 flex items-start gap-3 ${isMe ? "border-blue-400 ring-2 ring-blue-100" : "border-zinc-200"}`}>
       <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${color}`}>
         {initials(person.name)}
       </div>
@@ -322,6 +324,11 @@ function PersonCard({
           <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${roleBadgeClass}`}>
             {roleLabel}{roleWeight !== undefined ? ` · ${roleWeight}%` : ""}
           </span>
+          {isMe && (
+            <span className="inline-flex items-center rounded-full bg-blue-600 px-2 py-0.5 text-xs font-bold text-white">
+              Bạn
+            </span>
+          )}
         </div>
         <p className="text-xs text-zinc-400 mt-0.5">{person.videoIds.length} video</p>
         {person.videoIds.length > 0 && (
@@ -514,6 +521,7 @@ function AnalyticsSection({ summaries }: { summaries: PersonSummaryRow[] }) {
         const expanded = expandedIds.has(row.person.id);
         const color = avatarColor(idx);
         const roleLabel = row.person.role === "WRITER" ? "Content" : "Editor";
+        const roleWeight = row.videos[0]?.roleWeight;
         const roleBadgeClass =
           row.person.role === "WRITER"
             ? "border-blue-300 bg-blue-50 text-blue-700"
@@ -533,10 +541,17 @@ function AnalyticsSection({ summaries }: { summaries: PersonSummaryRow[] }) {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-bold text-zinc-900 text-sm">{row.person.name}</span>
                   <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${roleBadgeClass}`}>
-                    {roleLabel}
+                    {roleLabel}{roleWeight !== undefined ? ` · ${roleWeight}%` : ""}
                   </span>
                 </div>
-                <p className="text-xs text-zinc-500 mt-0.5">{row.videos.length} videos</p>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  {row.videos.length} videos
+                  {roleWeight !== undefined && (
+                    <span className="ml-1.5 text-zinc-400">
+                      — tỉ lệ quy đổi <span className="font-semibold text-zinc-600">{roleWeight}%</span> tổng views / video
+                    </span>
+                  )}
+                </p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 <div className="text-right">
@@ -642,9 +657,25 @@ const DEFAULT_DATE_RANGE: DateRangeValue = { type: "28days", label: "28 ngày qu
 
 interface Props {
   channelId: string;
+  /** Nếu truyền vào, date range được điều khiển từ bên ngoài (controlled). */
+  dateRange?: DateRangeValue;
+  onDateRangeChange?: (dr: DateRangeValue) => void;
+  /** ID người dùng hiện tại (để highlight "bạn" trong danh sách). */
+  myPersonId?: string;
+  /** Callback mỗi khi summaries được tính lại — dùng để page ngoài lấy dữ liệu KPI. */
+  onSummariesChange?: (summaries: PersonSummaryRow[]) => void;
+  /** Callback khi danh sách persons thay đổi. */
+  onPersonsChange?: (persons: { id: string; name: string; role: string }[]) => void;
 }
 
-export function LocalTeamManager({ channelId }: Props) {
+export function LocalTeamManager({
+  channelId,
+  dateRange: externalDateRange,
+  onDateRangeChange,
+  myPersonId,
+  onSummariesChange,
+  onPersonsChange,
+}: Props) {
   const [activeTab, setActiveTab] = useState<"manage" | "analytics">("manage");
   const [persons, setPersons] = useState<LocalPerson[]>([]);
   const [weights, setWeights] = useState<Record<string, number>>({});
@@ -652,16 +683,22 @@ export function LocalTeamManager({ channelId }: Props) {
   const [fetchingViews, setFetchingViews] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
+  const [internalDateRange, setInternalDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
+
+  const dateRange = externalDateRange ?? internalDateRange;
+  function setDateRange(dr: DateRangeValue) {
+    if (onDateRangeChange) onDateRangeChange(dr);
+    else setInternalDateRange(dr);
+  }
   const fetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load from localStorage whenever channelId changes
+  // Load from DB whenever channelId changes
   useEffect(() => {
     if (!channelId) return;
-    setPersons(loadPersons(channelId));
     setViewMap(new Map());
     setEditingId(null);
     setShowAddForm(false);
+    loadPersonsFromDB(channelId).then(setPersons);
   }, [channelId]);
 
   // Load weight config
@@ -687,6 +724,7 @@ export function LocalTeamManager({ channelId }: Props) {
       setFetchingViews(true);
       try {
         const params = new URLSearchParams({ ids: allIds.join(","), dateRange: dr.type });
+        if (channelId) params.set("channelId", channelId);
         if (dr.month) params.set("month", String(dr.month));
         if (dr.year)  params.set("year",  String(dr.year));
         const res = await fetch(`/api/videos/views-lookup?${params}`);
@@ -699,7 +737,7 @@ export function LocalTeamManager({ channelId }: Props) {
         setFetchingViews(false);
       }
     }, 400);
-  }, []);
+  }, [channelId]);
 
   useEffect(() => {
     fetchViews(persons, dateRange);
@@ -707,7 +745,7 @@ export function LocalTeamManager({ channelId }: Props) {
 
   function persist(updated: LocalPerson[]) {
     setPersons(updated);
-    savePersons(channelId, updated);
+    savePersonsToDB(channelId, updated);
   }
 
   function handleAdd(name: string, role: "WRITER" | "EDITOR", videoIds: string[]) {
@@ -742,7 +780,20 @@ export function LocalTeamManager({ channelId }: Props) {
     setActiveTab("analytics");
   }
 
-  const summaries = computeSummaries(persons, viewMap, weights);
+  const summaries = useMemo(
+    () => computeSummaries(persons, viewMap, weights),
+    [persons, viewMap, weights]
+  );
+
+  useEffect(() => {
+    onSummariesChange?.(summaries);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summaries]);
+
+  useEffect(() => {
+    onPersonsChange?.(persons.map((p) => ({ id: p.id, name: p.name, role: p.role })));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persons]);
 
   return (
     <div className="space-y-4">
@@ -832,6 +883,7 @@ export function LocalTeamManager({ channelId }: Props) {
                     person={p}
                     index={idx}
                     weights={weights}
+                    isMe={myPersonId === p.id}
                     onEdit={() => { setEditingId(p.id); setShowAddForm(false); }}
                     onDelete={() => handleDelete(p.id)}
                   />
@@ -860,7 +912,7 @@ export function LocalTeamManager({ channelId }: Props) {
           )}
 
           <p className="text-xs text-zinc-400 text-center">
-            Dữ liệu lưu tại trình duyệt — chỉ hiển thị với tài khoản đang đăng nhập trên thiết bị này
+            Dữ liệu lưu trên server — đồng bộ với mọi thiết bị và tài khoản trong kênh
           </p>
         </div>
       )}

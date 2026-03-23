@@ -59,27 +59,35 @@ export async function GET(req: Request) {
 
     const videoIds = videos.map((v) => v.id);
 
-    // ── Channel total views (all videos in channel for this period) ──────────
+    // ── Channel total views + video count + lastSyncedAt (all videos in channel) ──
     let channelTotalViews = 0;
+    let channelVideoCount = 0;
+    let channelLastSyncedAt: Date | null = null;
     if (channelId) {
-      type ChanViewRow = { total: bigint };
-      const cvRows = await db.$queryRaw<ChanViewRow[]>`
-        SELECT COALESCE(SUM(s.views), 0)::bigint AS total
+      type ChanRow = { total: bigint; videoCount: bigint; lastFetchedAt: Date | null };
+      const cvRows = await db.$queryRaw<ChanRow[]>`
+        SELECT
+          COALESCE(SUM(s.views), 0)::bigint AS total,
+          COUNT(DISTINCT s."videoId")::bigint AS "videoCount",
+          MAX(s."fetchedAt") AS "lastFetchedAt"
         FROM analytics_snapshots s
         JOIN videos v ON v.id = s."videoId"
         WHERE v."channelId" = ${channelId}
           AND s."startDate" = ${startDate}::date
           AND s.date = ${endDate}::date`;
       channelTotalViews = Number(cvRows[0]?.total ?? 0);
+      channelVideoCount = Number(cvRows[0]?.videoCount ?? 0);
+      channelLastSyncedAt = cvRows[0]?.lastFetchedAt ?? null;
     }
 
     if (videoIds.length === 0) {
       return NextResponse.json({
         dateRange,
         dataSource: "no_data",
-        lastSyncedAt: null,
+        lastSyncedAt: channelLastSyncedAt,
         channels,
         channelTotalViews,
+        channelVideoCount,
         summary: { views: 0, weightedViews: 0, videoCount: 0 },
         topVideos: [],
       });
@@ -205,9 +213,10 @@ export async function GET(req: Request) {
     return NextResponse.json({
       dateRange,
       dataSource: snapshots.length > 0 ? "analytics_snapshot" : "no_data",
-      lastSyncedAt,
+      lastSyncedAt: channelLastSyncedAt ?? lastSyncedAt,
       channels,
       channelTotalViews,
+      channelVideoCount,
       summary: {
         views: totalActualViews,
         weightedViews: totalWeightedViews,

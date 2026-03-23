@@ -1,6 +1,7 @@
 import { requireRole } from "@/lib/auth";
 import { Settings } from "lucide-react";
 import { PermissionsTable } from "./permissions-table";
+import { CronSettings } from "./cron-settings";
 import { db } from "@/lib/db";
 import type { Metric } from "@prisma/client";
 
@@ -30,6 +31,20 @@ export default async function SettingsPage() {
           </p>
         </div>
         <PermissionsTable initialMatrix={matrix} />
+      </div>
+
+      {/* Cron Job Settings */}
+      <div className="rounded-xl border bg-white shadow-sm">
+        <div className="border-b px-5 py-4">
+          <h2 className="text-base font-semibold text-zinc-900">Tự động đồng bộ (Cron Job)</h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            Cấu hình lịch tự động kéo dữ liệu từ YouTube Analytics cho từng kênh.
+            Cron chạy mỗi giờ và kiểm tra xem có đến giờ chạy chưa.
+          </p>
+        </div>
+        <div className="px-5 py-5">
+          <CronSettings />
+        </div>
       </div>
     </div>
   );

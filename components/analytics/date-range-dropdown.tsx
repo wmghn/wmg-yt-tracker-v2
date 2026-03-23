@@ -34,6 +34,7 @@ function buildOptions(now: Date) {
   // ── Quick ranges ──────────────────────────────────────────────────────────
   groups.push({
     options: [
+      { label: "Tháng này",       value: { type: "month", month: currentMonth, year: currentYear, label: "Tháng này" } },
       { label: "7 ngày qua",      value: { type: "7days",    label: "7 ngày qua" } },
       { label: "28 ngày qua",     value: { type: "28days",   label: "28 ngày qua" } },
       { label: "90 ngày qua",     value: { type: "90days",   label: "90 ngày qua" } },

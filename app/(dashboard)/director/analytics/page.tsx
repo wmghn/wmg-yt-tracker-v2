@@ -8,6 +8,9 @@ import {
   Video,
   Users,
   RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  Clock,
 } from "lucide-react";
 import {
   BarChart,
@@ -22,7 +25,6 @@ import { SyncButton } from "@/components/analytics/sync-button";
 import { DateRangeDropdown, type DateRangeValue } from "@/components/analytics/date-range-dropdown";
 import { ChannelDropdown } from "@/components/analytics/channel-dropdown";
 import { VideoIdCell } from "@/components/analytics/video-id-cell";
-import { TeamMemberSection } from "@/components/analytics/team-member-section";
 import { LocalTeamManager } from "@/components/analytics/local-team-manager";
 import { SampleExportPanel } from "@/components/analytics/sample-export-panel";
 import { resolveDateRange, type DateRangeType } from "@/lib/youtube/analytics-api";
@@ -90,6 +92,11 @@ function DirectorAnalyticsContent() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  function toggleSection(key: string) {
+    setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
 
   function pushUrl(dr: DateRangeValue, channelId: string) {
     const p = new URLSearchParams();
@@ -156,35 +163,36 @@ function DirectorAnalyticsContent() {
           )}
         </div>
         {data && (
-          <div className="flex flex-col items-end gap-0.5">
-            <span className="text-sm text-zinc-400">{data.dateRange.label}</span>
-            {data.lastSyncedAt ? (
-              <span className="text-xs text-zinc-400">
-                Cập nhật lúc {new Date(data.lastSyncedAt).toLocaleString("vi-VN")}
-              </span>
-            ) : (
-              <span className="text-xs text-zinc-400 italic">Chưa có dữ liệu — nhấn &ldquo;Cập nhật từ YouTube&rdquo;</span>
-            )}
-          </div>
+          data.lastSyncedAt ? (
+            <span className="flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700">
+              <Clock className="h-3.5 w-3.5 shrink-0" />
+              Dữ liệu cập nhật lúc{" "}
+              {new Date(data.lastSyncedAt).toLocaleString("vi-VN", {
+                day: "2-digit", month: "2-digit", year: "numeric",
+                hour: "2-digit", minute: "2-digit",
+              })}
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 rounded-full bg-zinc-100 border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-500">
+              <Clock className="h-3.5 w-3.5 shrink-0" />
+              Chưa có dữ liệu — nhấn &ldquo;Cập nhật từ YouTube&rdquo;
+            </span>
+          )
         )}
       </div>
 
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-2">
-        <DateRangeDropdown value={dateRange} onChange={handleDateRangeChange} />
-
         {data && data.channels.length > 1 && (
-          <>
-            <div className="h-5 w-px bg-zinc-200" />
-            <ChannelDropdown
-              channels={data.channels}
-              value={selectedChannel}
-              onChange={handleChannelChange}
-            />
-          </>
+          <ChannelDropdown
+            channels={data.channels}
+            value={selectedChannel}
+            onChange={handleChannelChange}
+          />
         )}
 
-        <div className="ml-auto">
+        <div className="flex items-center gap-2 ml-auto">
+          <DateRangeDropdown value={dateRange} onChange={handleDateRangeChange} />
           <SyncButton
             channelId={selectedChannel || undefined}
             dateRange={dateRange.type}
@@ -216,229 +224,226 @@ function DirectorAnalyticsContent() {
             <div className="rounded-xl border bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">
-                    Tổng Views
-                  </p>
-                  <p className="mt-1 text-2xl font-bold text-zinc-900">
-                    {fmt(data.summary.views)}
-                  </p>
+                  <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">Tổng Views</p>
+                  <p className="mt-1 text-2xl font-bold text-zinc-900">{fmt(data.summary.views)}</p>
                 </div>
-                <div className="rounded-lg bg-blue-50 p-2 shrink-0">
-                  <Eye className="h-5 w-5 text-blue-600" />
-                </div>
+                <div className="rounded-lg bg-blue-50 p-2 shrink-0"><Eye className="h-5 w-5 text-blue-600" /></div>
               </div>
             </div>
-
             <div className="rounded-xl border bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">
-                    Video
-                  </p>
-                  <p className="mt-1 text-2xl font-bold text-zinc-900">
-                    {data.summary.videoCount}
-                  </p>
+                  <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">Video</p>
+                  <p className="mt-1 text-2xl font-bold text-zinc-900">{data.summary.videoCount}</p>
                 </div>
-                <div className="rounded-lg bg-violet-50 p-2 shrink-0">
-                  <Video className="h-5 w-5 text-violet-600" />
-                </div>
+                <div className="rounded-lg bg-violet-50 p-2 shrink-0"><Video className="h-5 w-5 text-violet-600" /></div>
               </div>
             </div>
-
             <div className="rounded-xl border bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">
-                    Nhân sự
-                  </p>
-                  <p className="mt-1 text-2xl font-bold text-zinc-900">
-                    {data.summary.staffCount}
-                  </p>
+                  <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">Nhân sự</p>
+                  <p className="mt-1 text-2xl font-bold text-zinc-900">{data.summary.staffCount}</p>
                 </div>
-                <div className="rounded-lg bg-orange-50 p-2 shrink-0">
-                  <Users className="h-5 w-5 text-orange-600" />
-                </div>
+                <div className="rounded-lg bg-orange-50 p-2 shrink-0"><Users className="h-5 w-5 text-orange-600" /></div>
               </div>
             </div>
           </div>
 
           {/* Staff breakdown bar chart */}
           {data.staffBreakdown.length > 0 && (
-            <div className="rounded-xl border bg-white p-5 shadow-sm">
-              <h2 className="mb-1 text-sm font-semibold text-zinc-900">Views theo nhân sự</h2>
-              <p className="mb-4 text-xs text-zinc-400">Top 10 nhân sự</p>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart
-                  data={data.staffBreakdown.slice(0, 10).map((s) => ({
-                    name: s.name.split(" ").slice(-1)[0],
-                    fullName: s.name,
-                    Views: s.views,
-                  }))}
-                  margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fontSize: 11, fill: "#9ca3af" }}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    tickFormatter={fmt}
-                    tick={{ fontSize: 11, fill: "#9ca3af" }}
-                    tickLine={false}
-                    axisLine={false}
-                    width={45}
-                  />
-                  <Tooltip
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    formatter={(v: any) => fmt(Number(v))}
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    labelFormatter={(_: any, payload: any) =>
-                      payload?.[0]?.payload?.fullName ?? _
-                    }
-                  />
-                  <Bar dataKey="Views" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+              <button
+                type="button"
+                onClick={() => toggleSection("chart")}
+                className="w-full flex items-center justify-between px-5 py-4 hover:bg-zinc-50/50 transition-colors"
+              >
+                <div className="text-left">
+                  <h2 className="text-sm font-semibold text-zinc-900">Views theo nhân sự</h2>
+                  {collapsed["chart"] && (
+                    <p className="text-xs text-zinc-400 mt-0.5">Top 10 nhân sự</p>
+                  )}
+                </div>
+                {collapsed["chart"] ? (
+                  <ChevronDown className="h-4 w-4 text-zinc-400 shrink-0" />
+                ) : (
+                  <ChevronUp className="h-4 w-4 text-zinc-400 shrink-0" />
+                )}
+              </button>
+              {!collapsed["chart"] && (
+                <div className="px-5 pb-5">
+                  <p className="mb-4 text-xs text-zinc-400">Top 10 nhân sự</p>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart
+                      data={data.staffBreakdown.slice(0, 10).map((s) => ({
+                        name: s.name.split(" ").slice(-1)[0],
+                        fullName: s.name,
+                        Views: s.views,
+                      }))}
+                      margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
+                      <YAxis tickFormatter={fmt} tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} width={45} />
+                      <Tooltip
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        formatter={(v: any) => fmt(Number(v))}
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        labelFormatter={(_: any, payload: any) => payload?.[0]?.payload?.fullName ?? _}
+                      />
+                      <Bar dataKey="Views" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </div>
           )}
 
           {/* Top Videos Table */}
-          <div className="rounded-xl border bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b px-5 py-4">
+          <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggleSection("videos")}
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-zinc-50/50 transition-colors"
+            >
               <h2 className="text-sm font-semibold text-zinc-900">
                 {selectedChannel ? "Tất cả video trong kênh" : "Top video"}{" "}
                 ({data.topVideos.length})
               </h2>
-              {data.mode === "channel" && (
-                <span className="text-xs text-zinc-400">Sắp xếp theo views giảm dần</span>
-              )}
-            </div>
-
-            {data.topVideos.length === 0 ? (
-              <p className="py-8 text-center text-sm text-zinc-400">Chưa có video nào</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-zinc-50">
-                      <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">
-                        Tiêu đề
-                      </th>
-                      <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">
-                        Video ID
-                      </th>
-                      {!selectedChannel && (
-                        <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">
-                          Kênh
-                        </th>
-                      )}
-                      <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">
-                        Nhân sự
-                      </th>
-                      <th className="px-5 py-2.5 text-right text-xs font-medium text-zinc-500">
-                        Views
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.topVideos.map((v) => (
-                      <tr
-                        key={v.videoId}
-                        className="border-b last:border-0 hover:bg-zinc-50/50"
-                      >
-                        <td className="px-5 py-3">
-                          <div className="flex items-center gap-3">
-                            {v.thumbnailUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={v.thumbnailUrl}
-                                alt=""
-                                className="h-10 w-16 shrink-0 rounded object-cover bg-zinc-100"
-                              />
-                            ) : (
-                              <div className="h-10 w-16 shrink-0 rounded bg-zinc-100" />
-                            )}
-                            <p className="font-medium text-zinc-900 line-clamp-2 max-w-[280px]">
-                              {v.title || <span className="text-zinc-400 italic">Chưa có tiêu đề</span>}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="px-5 py-3">
-                          <VideoIdCell
-                            videoId={v.videoId}
-                            youtubeVideoId={v._youtubeVideoId ?? v.youtubeVideoId}
-                            onUpdated={(newId) => {
-                              setData((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      topVideos: prev.topVideos.map((t) =>
-                                        t.videoId === v.videoId
-                                          ? { ...t, _youtubeVideoId: newId }
-                                          : t
-                                      ),
-                                    }
-                                  : prev
-                              );
-                            }}
-                          />
-                        </td>
-                        {!selectedChannel && (
-                          <td className="px-5 py-3 text-sm text-zinc-600">
-                            {v.channelName}
-                          </td>
-                        )}
-                        <td className="px-5 py-3">
-                          {v.staff.length === 0 ? (
-                            <span className="text-xs text-zinc-400">Chưa assign</span>
-                          ) : (
-                            <div className="flex flex-wrap gap-1">
-                              {v.staff.slice(0, 2).map((s, i) => (
-                                <span
-                                  key={i}
-                                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                                    s.role === "WRITER"
-                                      ? "bg-blue-50 text-blue-700"
-                                      : "bg-purple-50 text-purple-700"
-                                  }`}
-                                >
-                                  {s.name.split(" ").slice(-1)[0]}
-                                </span>
-                              ))}
-                              {v.staff.length > 2 && (
-                                <span className="text-xs text-zinc-400">
-                                  +{v.staff.length - 2}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-5 py-3 text-right font-semibold text-zinc-900">
-                          {fmt(v.metrics.views)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="flex items-center gap-3">
+                {!collapsed["videos"] && data.mode === "channel" && (
+                  <span className="text-xs text-zinc-400">Sắp xếp theo views giảm dần</span>
+                )}
+                {collapsed["videos"] ? (
+                  <ChevronDown className="h-4 w-4 text-zinc-400 shrink-0" />
+                ) : (
+                  <ChevronUp className="h-4 w-4 text-zinc-400 shrink-0" />
+                )}
               </div>
+            </button>
+
+            {!collapsed["videos"] && (
+              data.topVideos.length === 0 ? (
+                <p className="py-8 text-center text-sm text-zinc-400 border-t">Chưa có video nào</p>
+              ) : (
+                <div className="overflow-x-auto border-t">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-zinc-50">
+                        <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">Tiêu đề</th>
+                        <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">Video ID</th>
+                        {!selectedChannel && (
+                          <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">Kênh</th>
+                        )}
+                        <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">Nhân sự</th>
+                        <th className="px-5 py-2.5 text-right text-xs font-medium text-zinc-500">Views</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.topVideos.map((v) => (
+                        <tr key={v.videoId} className="border-b last:border-0 hover:bg-zinc-50/50">
+                          <td className="px-5 py-3">
+                            <div className="flex items-center gap-3">
+                              {v.thumbnailUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={v.thumbnailUrl} alt="" className="h-10 w-16 shrink-0 rounded object-cover bg-zinc-100" />
+                              ) : (
+                                <div className="h-10 w-16 shrink-0 rounded bg-zinc-100" />
+                              )}
+                              <p className="font-medium text-zinc-900 line-clamp-2 max-w-[280px]">
+                                {v.title || <span className="text-zinc-400 italic">Chưa có tiêu đề</span>}
+                              </p>
+                            </div>
+                          </td>
+                          <td className="px-5 py-3">
+                            <VideoIdCell
+                              videoId={v.videoId}
+                              youtubeVideoId={v._youtubeVideoId ?? v.youtubeVideoId}
+                              onUpdated={(newId) => {
+                                setData((prev) =>
+                                  prev ? {
+                                    ...prev,
+                                    topVideos: prev.topVideos.map((t) =>
+                                      t.videoId === v.videoId ? { ...t, _youtubeVideoId: newId } : t
+                                    ),
+                                  } : prev
+                                );
+                              }}
+                            />
+                          </td>
+                          {!selectedChannel && (
+                            <td className="px-5 py-3 text-sm text-zinc-600">{v.channelName}</td>
+                          )}
+                          <td className="px-5 py-3">
+                            {v.staff.length === 0 ? (
+                              <span className="text-xs text-zinc-400">Chưa assign</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1">
+                                {v.staff.slice(0, 2).map((s, i) => (
+                                  <span
+                                    key={i}
+                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                      s.role === "WRITER" ? "bg-blue-50 text-blue-700" : "bg-purple-50 text-purple-700"
+                                    }`}
+                                  >
+                                    {s.name.split(" ").slice(-1)[0]}
+                                  </span>
+                                ))}
+                                {v.staff.length > 2 && (
+                                  <span className="text-xs text-zinc-400">+{v.staff.length - 2}</span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-5 py-3 text-right font-semibold text-zinc-900">
+                            {fmt(v.metrics.views)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
             )}
           </div>
 
-          {/* Team Member Analytics */}
-          {selectedChannel && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-zinc-900">Phân tích chi tiết nhân sự</h2>
-              <TeamMemberSection channelId={selectedChannel} />
-            </div>
-          )}
 
-          {/* Local team manager — paste video IDs & analyse */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <h2 className="text-sm font-semibold text-zinc-900">Quản lý nhân sự & Video IDs</h2>
-              {selectedChannel && data.topVideos.length > 0 && (
+        </>
+      )}
+
+      {/* Local team manager — nằm ngoài block loading để không bị unmount khi đổi filter */}
+      {selectedChannel && (
+        <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between gap-3 px-5 py-4">
+            <button
+              type="button"
+              onClick={() => toggleSection("teamManager")}
+              className="flex items-center gap-2 flex-1 min-w-0 text-left"
+            >
+              <h2 className="text-sm font-semibold text-zinc-900">View Tracker</h2>
+              {collapsed["teamManager"] ? (
+                <ChevronDown className="h-4 w-4 text-zinc-400 shrink-0" />
+              ) : (
+                <ChevronUp className="h-4 w-4 text-zinc-400 shrink-0" />
+              )}
+            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {data && (data.lastSyncedAt ? (
+                <span className="flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                  <Clock className="h-3 w-3 shrink-0" />
+                  Cập nhật{" "}
+                  {new Date(data.lastSyncedAt).toLocaleString("vi-VN", {
+                    day: "2-digit", month: "2-digit", year: "numeric",
+                    hour: "2-digit", minute: "2-digit",
+                  })}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 rounded-full bg-zinc-100 border border-zinc-200 px-2.5 py-1 text-xs text-zinc-400">
+                  <Clock className="h-3 w-3 shrink-0" />
+                  Chưa có dữ liệu
+                </span>
+              ))}
+              {!loading && data && data.topVideos.length > 0 && !collapsed["teamManager"] && (
                 <SampleExportPanel
                   videos={data.topVideos.map((v) => ({
                     youtubeVideoId: v._youtubeVideoId ?? v.youtubeVideoId,
@@ -448,9 +453,13 @@ function DirectorAnalyticsContent() {
                 />
               )}
             </div>
-            <LocalTeamManager channelId={selectedChannel} />
           </div>
-        </>
+          {!collapsed["teamManager"] && (
+            <div className="border-t px-5 py-4">
+              <LocalTeamManager channelId={selectedChannel} />
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

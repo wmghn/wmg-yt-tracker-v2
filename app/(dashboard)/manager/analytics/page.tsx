@@ -8,6 +8,7 @@ import {
   Video,
   Users,
   RefreshCw,
+  Clock,
 } from "lucide-react";
 import {
   BarChart,
@@ -21,7 +22,6 @@ import {
 import { SyncButton } from "@/components/analytics/sync-button";
 import { DateRangeDropdown, type DateRangeValue } from "@/components/analytics/date-range-dropdown";
 import { ChannelDropdown } from "@/components/analytics/channel-dropdown";
-import { TeamMemberSection } from "@/components/analytics/team-member-section";
 import { LocalTeamManager } from "@/components/analytics/local-team-manager";
 import { resolveDateRange, type DateRangeType } from "@/lib/youtube/analytics-api";
 
@@ -157,35 +157,36 @@ function ManagerAnalyticsContent() {
           )}
         </div>
         {data && (
-          <div className="flex flex-col items-end gap-0.5">
-            <span className="text-sm text-zinc-400">{data.dateRange.label}</span>
-            {data.lastSyncedAt ? (
-              <span className="text-xs text-zinc-400">
-                Cập nhật lúc {new Date(data.lastSyncedAt).toLocaleString("vi-VN")}
-              </span>
-            ) : (
-              <span className="text-xs text-zinc-400 italic">Chưa có dữ liệu — nhấn &ldquo;Cập nhật từ YouTube&rdquo;</span>
-            )}
-          </div>
+          data.lastSyncedAt ? (
+            <span className="flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700">
+              <Clock className="h-3.5 w-3.5 shrink-0" />
+              Dữ liệu cập nhật lúc{" "}
+              {new Date(data.lastSyncedAt).toLocaleString("vi-VN", {
+                day: "2-digit", month: "2-digit", year: "numeric",
+                hour: "2-digit", minute: "2-digit",
+              })}
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 rounded-full bg-zinc-100 border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-500">
+              <Clock className="h-3.5 w-3.5 shrink-0" />
+              Chưa có dữ liệu — nhấn &ldquo;Cập nhật từ YouTube&rdquo;
+            </span>
+          )
         )}
       </div>
 
       {/* Filters row */}
       <div className="flex flex-wrap items-center gap-2">
-        <DateRangeDropdown value={dateRange} onChange={handleDateRangeChange} />
-
         {data && data.channels.length > 1 && (
-          <>
-            <div className="h-5 w-px bg-zinc-200" />
-            <ChannelDropdown
-              channels={data.channels}
-              value={selectedChannel}
-              onChange={handleChannelChange}
-            />
-          </>
+          <ChannelDropdown
+            channels={data.channels}
+            value={selectedChannel}
+            onChange={handleChannelChange}
+          />
         )}
 
-        <div className="ml-auto">
+        <div className="flex items-center gap-2 ml-auto">
+          <DateRangeDropdown value={dateRange} onChange={handleDateRangeChange} />
           <SyncButton
             channelId={selectedChannel || undefined}
             dateRange={dateRange.type}
@@ -305,19 +306,6 @@ function ManagerAnalyticsContent() {
             </div>
           )}
 
-          {/* Team Member Analytics */}
-          {selectedChannel && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-zinc-900">Phân tích chi tiết nhân sự</h2>
-              <TeamMemberSection channelId={selectedChannel} />
-            </div>
-          )}
-
-          {/* Local team manager — paste video IDs & analyse */}
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-zinc-900">Quản lý nhân sự & Video IDs</h2>
-            <LocalTeamManager channelId={selectedChannel} />
-          </div>
 
           {/* Top Videos */}
           <div className="rounded-xl border bg-white shadow-sm">
@@ -411,6 +399,33 @@ function ManagerAnalyticsContent() {
             )}
           </div>
         </>
+      )}
+
+      {/* Local team manager — nằm ngoài block loading để không bị unmount khi đổi filter */}
+      {selectedChannel && (
+        <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between gap-3 px-5 py-4">
+            <h2 className="text-sm font-semibold text-zinc-900">View Tracker</h2>
+            {data && (data.lastSyncedAt ? (
+              <span className="flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                <Clock className="h-3 w-3 shrink-0" />
+                Cập nhật{" "}
+                {new Date(data.lastSyncedAt).toLocaleString("vi-VN", {
+                  day: "2-digit", month: "2-digit", year: "numeric",
+                  hour: "2-digit", minute: "2-digit",
+                })}
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 rounded-full bg-zinc-100 border border-zinc-200 px-2.5 py-1 text-xs text-zinc-400">
+                <Clock className="h-3 w-3 shrink-0" />
+                Chưa có dữ liệu
+              </span>
+            ))}
+          </div>
+          <div className="border-t px-5 py-4">
+            <LocalTeamManager channelId={selectedChannel} />
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { syncAnalyticsSnapshots } from "@/lib/analytics/sync";
 import type { DateRangeType } from "@/lib/youtube/analytics-api";
 
 /**
@@ -55,34 +56,57 @@ export async function POST(req: Request) {
       },
     });
 
-    // Fire background function (không await — nó trả 202 ngay)
     const internalSecret = process.env.INTERNAL_SYNC_SECRET;
-    if (!internalSecret) {
-      return NextResponse.json({ error: "INTERNAL_SYNC_SECRET chưa được cấu hình" }, { status: 500 });
+    const isNetlify = !!process.env.NETLIFY;
+
+    if (isNetlify) {
+      // Production: fire Netlify Background Function (không await)
+      if (!internalSecret) {
+        return NextResponse.json({ error: "INTERNAL_SYNC_SECRET chưa được cấu hình" }, { status: 500 });
+      }
+
+      const baseUrl = process.env.NETLIFY_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:8888";
+
+      fetch(`${baseUrl}/.netlify/functions/sync-background`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: job.id, channelIds, dateRange: rangeType, month, year, secret: internalSecret }),
+      }).then(async (res) => {
+        if (!res.ok) {
+          await db.syncJob.update({
+            where: { id: job.id },
+            data: { status: "error", result: { errors: [`Background function trả về ${res.status}`], channelsSynced: 0, videosSynced: 0, snapshotsUpserted: 0 } },
+          }).catch(() => {});
+        }
+      }).catch(() => {
+        db.syncJob.update({
+          where: { id: job.id },
+          data: { status: "error", result: { errors: ["Không thể khởi động background function"], channelsSynced: 0, videosSynced: 0, snapshotsUpserted: 0 } },
+        }).catch(() => {});
+      });
+    } else {
+      // Local dev: chạy sync trực tiếp trong background (không await response)
+      void (async () => {
+        try {
+          await db.syncJob.update({ where: { id: job.id }, data: { status: "running" } });
+          const result = await syncAnalyticsSnapshots(channelIds, rangeType, month, year);
+          await db.syncJob.update({
+            where: { id: job.id },
+            data: {
+              status: result.errors.length > 0 ? "error" : "done",
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              result: result as any,
+            },
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          await db.syncJob.update({
+            where: { id: job.id },
+            data: { status: "error", result: { errors: [msg], channelsSynced: 0, videosSynced: 0, snapshotsUpserted: 0 } },
+          }).catch(() => {});
+        }
+      })();
     }
-
-    const baseUrl = process.env.NETLIFY_URL
-      ?? process.env.NEXTAUTH_URL
-      ?? "http://localhost:8888";
-
-    fetch(`${baseUrl}/.netlify/functions/sync-background`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jobId: job.id,
-        channelIds,
-        dateRange: rangeType,
-        month,
-        year,
-        secret: internalSecret,
-      }),
-    }).catch(() => {
-      // Cập nhật job thành error nếu không gọi được background fn
-      db.syncJob.update({
-        where: { id: job.id },
-        data: { status: "error", result: { errors: ["Không thể khởi động background function"] } },
-      }).catch(() => {});
-    });
 
     return NextResponse.json({ jobId: job.id }, { status: 202 });
   } catch (err) {

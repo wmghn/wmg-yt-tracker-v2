@@ -28,6 +28,7 @@ export async function GET(req: Request) {
     const rangeType = (searchParams.get("dateRange") ?? "lifetime") as DateRangeType;
     const month = searchParams.get("month") ? Number(searchParams.get("month")) : undefined;
     const year  = searchParams.get("year")  ? Number(searchParams.get("year"))  : undefined;
+    const channelId = searchParams.get("channelId") ?? null;
     const dateRange = resolveDateRange(rangeType, month, year);
     const { startDate, endDate } = dateRange;
 
@@ -37,32 +38,61 @@ export async function GET(req: Request) {
     let rows: Row[];
 
     if (useSnapshot) {
-      rows = await db.$queryRaw<Row[]>`
-        SELECT
-          v."youtubeVideoId",
-          v.title,
-          COALESCE(s.views, 0)::bigint AS "viewsCount"
-        FROM videos v
-        LEFT JOIN analytics_snapshots s
-          ON s."videoId" = v.id
-          AND s."startDate" = ${startDate}::date
-          AND s.date = ${endDate}::date
-        WHERE v."youtubeVideoId" = ANY(${ids}::text[])`;
+      rows = channelId
+        ? await db.$queryRaw<Row[]>`
+            SELECT
+              v."youtubeVideoId",
+              v.title,
+              COALESCE(s.views, 0)::bigint AS "viewsCount"
+            FROM videos v
+            LEFT JOIN analytics_snapshots s
+              ON s."videoId" = v.id
+              AND s."startDate" = ${startDate}::date
+              AND s.date = ${endDate}::date
+            WHERE v."youtubeVideoId" = ANY(${ids}::text[])
+              AND v."channelId" = ${channelId}`
+        : await db.$queryRaw<Row[]>`
+            SELECT
+              v."youtubeVideoId",
+              v.title,
+              COALESCE(s.views, 0)::bigint AS "viewsCount"
+            FROM videos v
+            LEFT JOIN analytics_snapshots s
+              ON s."videoId" = v.id
+              AND s."startDate" = ${startDate}::date
+              AND s.date = ${endDate}::date
+            WHERE v."youtubeVideoId" = ANY(${ids}::text[])`;
     } else {
-      rows = await db.$queryRaw<Row[]>`
-        SELECT
-          v."youtubeVideoId",
-          v.title,
-          COALESCE(
-            (SELECT vvl."viewsCount"
-             FROM video_views_log vvl
-             WHERE vvl."videoId" = v.id
-             ORDER BY vvl."recordedAt" DESC
-             LIMIT 1
-            ), 0
-          )::bigint AS "viewsCount"
-        FROM videos v
-        WHERE v."youtubeVideoId" = ANY(${ids}::text[])`;
+      rows = channelId
+        ? await db.$queryRaw<Row[]>`
+            SELECT
+              v."youtubeVideoId",
+              v.title,
+              COALESCE(
+                (SELECT vvl."viewsCount"
+                 FROM video_views_log vvl
+                 WHERE vvl."videoId" = v.id
+                 ORDER BY vvl."recordedAt" DESC
+                 LIMIT 1
+                ), 0
+              )::bigint AS "viewsCount"
+            FROM videos v
+            WHERE v."youtubeVideoId" = ANY(${ids}::text[])
+              AND v."channelId" = ${channelId}`
+        : await db.$queryRaw<Row[]>`
+            SELECT
+              v."youtubeVideoId",
+              v.title,
+              COALESCE(
+                (SELECT vvl."viewsCount"
+                 FROM video_views_log vvl
+                 WHERE vvl."videoId" = v.id
+                 ORDER BY vvl."recordedAt" DESC
+                 LIMIT 1
+                ), 0
+              )::bigint AS "viewsCount"
+            FROM videos v
+            WHERE v."youtubeVideoId" = ANY(${ids}::text[])`;
     }
 
     return NextResponse.json({

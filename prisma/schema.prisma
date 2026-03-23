@@ -93,9 +93,11 @@ model Channel {
   // Relations
   manager      User?                 @relation("ChannelManager", fields: [managerId], references: [id])
   creator      User                  @relation("ChannelCreator", fields: [createdBy], references: [id])
-  oauthToken   YoutubeOAuthToken?    @relation(fields: [oauthTokenId], references: [id])
-  members      ChannelMember[]
-  videos       Video[]
+  oauthToken     YoutubeOAuthToken?    @relation(fields: [oauthTokenId], references: [id])
+  members        ChannelMember[]
+  videos         Video[]
+  trackerConfig  ChannelTrackerConfig?
+  cronConfig     CronChannelConfig?
   weightConfigs ChannelWeightConfig[]
 
   @@index([managerId])
@@ -326,6 +328,62 @@ model MetricPermission {
   updatedAt    DateTime   @updatedAt
 
   @@map("metric_permissions")
+}
+
+// ─── Cron Job Config ──────────────────────────────────────────────────────────
+
+// Cấu hình toàn cục cho cron job analytics sync
+model CronConfig {
+  id        String    @id @default("singleton")
+  enabled   Boolean   @default(true)
+  frequency String    @default("daily")   // daily | every2days | weekly
+  runHour   Int       @default(2)          // 0-23 UTC hour
+  dateRange String    @default("month")    // month | 28days | 90days
+  lastRunAt DateTime?
+  lastResult Json?
+  updatedAt DateTime  @updatedAt
+
+  @@map("cron_config")
+}
+
+// Bật/tắt cron per-channel
+model CronChannelConfig {
+  id        String   @id @default(uuid())
+  channelId String   @unique
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@map("cron_channel_configs")
+}
+
+// Log từng lần cron chạy (tự xoá sau 7 ngày)
+model CronLog {
+  id                String   @id @default(uuid())
+  runAt             DateTime @default(now())
+  status            String   // "success" | "error" | "skipped"
+  skipReason        String?  // lý do skip nếu status = "skipped"
+  channelsSynced    Int      @default(0)
+  videosSynced      Int      @default(0)
+  snapshotsUpserted Int      @default(0)
+  errors            String[] @default([])
+  durationMs        Int?
+
+  @@index([runAt])
+  @@map("cron_logs")
+}
+
+// Lưu danh sách nhân sự + video IDs cho View Tracker theo từng kênh (thay thế localStorage)
+model ChannelTrackerConfig {
+  id        String   @id @default(uuid())
+  channelId String   @unique
+  data      Json     @default("[]") // LocalPerson[]
+  updatedAt DateTime @updatedAt
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@map("channel_tracker_configs")
 }
 
 model YoutubeOAuthToken {

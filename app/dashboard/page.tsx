@@ -3,9 +3,9 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "@/lib/auth";
 
 const ROLE_HOME: Record<string, string> = {
-  DIRECTOR: "/director",
-  MANAGER: "/manager",
-  STAFF: "/staff",
+  DIRECTOR: "/director/analytics",
+  MANAGER: "/manager/analytics",
+  STAFF: "/staff/analytics",
 };
 
 export default async function DashboardRedirectPage() {
