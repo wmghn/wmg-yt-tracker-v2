@@ -31,10 +31,16 @@
     "start": "next start",
     "lint": "next lint",
     "db:generate": "prisma generate",
+    "db:generate:sqlite": "prisma generate --config=prisma.config.sqlite.ts",
+    "db:generate:all": "prisma generate && prisma generate --config=prisma.config.sqlite.ts",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
+    "db:push:sqlite": "prisma db push --config=prisma.config.sqlite.ts",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:setup:local": "npm run db:generate:sqlite && npm run db:push:sqlite",
+    "db:switch:local": "echo 'DB_PROVIDER=sqlite' >> .env.local && echo 'DATABASE_URL=file:./local.db' >> .env.local && npm run db:setup:local",
+    "db:switch:cloud": "echo 'Xoá DB_PROVIDER và DATABASE_URL_SQLITE trong .env.local để dùng Supabase'"
   },
   "keywords": [],
   "author": "",

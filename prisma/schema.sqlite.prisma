@@ -1,0 +1,359 @@
+// SQLite-compatible schema (for local development without Supabase)
+// Differences from schema.prisma:
+//   - provider = "sqlite"
+//   - No enum types → String
+//   - No @db.* type modifiers
+//   - No String[] arrays → String (JSON-encoded, handled by adapter)
+//   - No UserRole[] → String (JSON-encoded)
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma-sqlite"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ─────────────────────────────────────────────
+// Models
+// ─────────────────────────────────────────────
+
+model User {
+  id               String   @id @default(uuid())
+  name             String
+  email            String   @unique
+  password         String
+  role             String   // UserRole: DIRECTOR | MANAGER | STAFF
+  baseSalary       Decimal  @default(0)
+  isActive         Boolean  @default(true)
+  twoFactorEnabled Boolean  @default(false)
+  twoFactorSecret  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  channelMemberships   ChannelMember[]       @relation("MemberUser")
+  addedMembers         ChannelMember[]       @relation("AddedByUser")
+  managedChannels      Channel[]             @relation("ChannelManager")
+  createdChannels      Channel[]             @relation("ChannelCreator")
+  submittedVideos      Video[]               @relation("VideoSubmitter")
+  videoRoleAssignments VideoRoleAssignment[] @relation("AssignedUser")
+  approvedAssignments  VideoRoleAssignment[] @relation("ApprovedByUser")
+  weightConfigs        ChannelWeightConfig[] @relation("WeightConfigCreator")
+  salaryConfigs        SalaryConfig[]        @relation("SalaryConfigUser")
+  createdSalaryConfigs SalaryConfig[]        @relation("SalaryConfigCreator")
+  lockedPeriods        PayrollPeriod[]       @relation("PeriodLocker")
+  createdPeriods       PayrollPeriod[]       @relation("PeriodCreator")
+  payrollRecords       PayrollRecord[]
+  permissionConfigs    PermissionConfig[]
+
+  @@map("users")
+}
+
+model Channel {
+  id               String  @id @default(uuid())
+  youtubeChannelId String  @unique
+  name             String
+  description      String?
+  status           String  @default("PENDING_BKT") // ChannelStatus
+  managerId        String?
+  oauthTokenId     String?
+  createdBy        String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  manager      User?                @relation("ChannelManager", fields: [managerId], references: [id])
+  creator      User                 @relation("ChannelCreator", fields: [createdBy], references: [id])
+  oauthToken   YoutubeOAuthToken?   @relation(fields: [oauthTokenId], references: [id])
+  members      ChannelMember[]
+  videos       Video[]
+  trackerConfig ChannelTrackerConfig?
+  cronConfig   CronChannelConfig?
+  weightConfigs ChannelWeightConfig[]
+
+  @@index([managerId])
+  @@index([status])
+  @@map("channels")
+}
+
+model ChannelMember {
+  id        String   @id @default(uuid())
+  channelId String
+  userId    String
+  addedBy   String
+  joinedAt  DateTime @default(now())
+
+  channel     Channel @relation(fields: [channelId], references: [id])
+  user        User    @relation("MemberUser", fields: [userId], references: [id])
+  addedByUser User    @relation("AddedByUser", fields: [addedBy], references: [id])
+
+  @@unique([channelId, userId])
+  @@index([channelId])
+  @@index([userId])
+  @@map("channel_members")
+}
+
+model Video {
+  id             String    @id @default(uuid())
+  youtubeVideoId String    @unique
+  channelId      String
+  title          String
+  thumbnailUrl   String?
+  publishedAt    DateTime?
+  isActive       Boolean   @default(true)
+  submittedBy    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  channel            Channel               @relation(fields: [channelId], references: [id])
+  submitter          User?                 @relation("VideoSubmitter", fields: [submittedBy], references: [id])
+  roleAssignments    VideoRoleAssignment[]
+  viewsLog           VideoViewsLog[]
+  analyticsSnapshots AnalyticsSnapshot[]
+
+  @@index([channelId])
+  @@index([submittedBy])
+  @@map("videos")
+}
+
+model VideoRoleAssignment {
+  id         String    @id @default(uuid())
+  videoId    String
+  userId     String
+  role       String    // VideoRole: WRITER | EDITOR
+  approvedBy String?
+  approvedAt DateTime?
+  status     String    @default("PENDING") // AssignmentStatus
+  createdAt  DateTime  @default(now())
+
+  video    Video  @relation(fields: [videoId], references: [id])
+  user     User   @relation("AssignedUser", fields: [userId], references: [id])
+  approver User?  @relation("ApprovedByUser", fields: [approvedBy], references: [id])
+
+  @@unique([videoId, userId, role])
+  @@index([videoId])
+  @@index([userId])
+  @@index([status])
+  @@map("video_role_assignments")
+}
+
+model VideoViewsLog {
+  id              String   @id @default(uuid())
+  videoId         String
+  viewsCount      BigInt
+  revenueEstimate Decimal?
+  recordedAt      DateTime
+  isForcedUpdate  Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  video Video @relation(fields: [videoId], references: [id])
+
+  @@index([videoId])
+  @@index([recordedAt])
+  @@map("video_views_log")
+}
+
+model ChannelWeightConfig {
+  id            String    @id @default(uuid())
+  channelId     String
+  role          String    // VideoRole
+  weightPercent Decimal
+  effectiveFrom DateTime
+  createdBy     String
+  createdAt     DateTime  @default(now())
+
+  channel Channel @relation(fields: [channelId], references: [id])
+  creator User    @relation("WeightConfigCreator", fields: [createdBy], references: [id])
+
+  @@unique([channelId, role, effectiveFrom])
+  @@index([channelId])
+  @@map("channel_weight_configs")
+}
+
+model SalaryConfig {
+  id                    String   @id @default(uuid())
+  userId                String
+  baseSalary            Decimal
+  bonusPerThousandViews Decimal
+  effectiveFrom         DateTime
+  createdBy             String
+  createdAt             DateTime @default(now())
+
+  user    User @relation("SalaryConfigUser", fields: [userId], references: [id])
+  creator User @relation("SalaryConfigCreator", fields: [createdBy], references: [id])
+
+  @@index([userId])
+  @@map("salary_configs")
+}
+
+model PayrollPeriod {
+  id        String    @id @default(uuid())
+  month     Int
+  year      Int
+  lockedAt  DateTime?
+  lockedBy  String?
+  createdBy String
+  createdAt DateTime  @default(now())
+
+  locker  User?          @relation("PeriodLocker", fields: [lockedBy], references: [id])
+  creator User           @relation("PeriodCreator", fields: [createdBy], references: [id])
+  records PayrollRecord[]
+
+  @@unique([month, year])
+  @@map("payroll_periods")
+}
+
+model PayrollRecord {
+  id           String   @id @default(uuid())
+  periodId     String
+  userId       String
+  baseSalary   Decimal
+  totalViews   BigInt
+  totalBonus   Decimal
+  totalSalary  Decimal
+  calculatedAt DateTime
+  detail       String   // Json stored as string
+  createdAt    DateTime @default(now())
+
+  period PayrollPeriod @relation(fields: [periodId], references: [id])
+  user   User          @relation(fields: [userId], references: [id])
+
+  @@unique([periodId, userId])
+  @@index([periodId])
+  @@index([userId])
+  @@map("payroll_records")
+}
+
+model PermissionConfig {
+  id           String   @id @default(uuid())
+  metric       String   @unique // Metric enum
+  allowedRoles String   @default("[]") // UserRole[] stored as JSON string
+  createdBy    String
+  updatedAt    DateTime @updatedAt
+
+  creator User @relation(fields: [createdBy], references: [id])
+
+  @@map("permission_configs")
+}
+
+model AnalyticsSnapshot {
+  id                      String   @id @default(uuid())
+  videoId                 String
+  startDate               DateTime
+  date                    DateTime
+  views                   BigInt   @default(0)
+  estimatedMinutesWatched Decimal?
+  averageViewDuration     Decimal?
+  subscribersGained       Int?
+  impressions             BigInt?
+  impressionCTR           Decimal?
+  estimatedRevenue        Decimal?
+  cpm                     Decimal?
+  likes                   Int?
+  comments                Int?
+  fetchedAt               DateTime @default(now())
+
+  video Video @relation(fields: [videoId], references: [id])
+
+  @@unique([videoId, startDate, date])
+  @@index([videoId])
+  @@index([date])
+  @@index([startDate])
+  @@map("analytics_snapshots")
+}
+
+model SyncJob {
+  id         String   @id @default(uuid())
+  status     String   @default("pending")
+  channelIds String   @default("[]") // String[] stored as JSON
+  dateRange  String
+  month      Int?
+  year       Int?
+  result     String?  // Json stored as string
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([status])
+  @@map("sync_jobs")
+}
+
+model MetricPermission {
+  id           String   @id @default(uuid())
+  metricKey    String   @unique
+  metricLabel  String
+  allowedRoles String   @default("[\"DIRECTOR\"]") // UserRole[] stored as JSON
+  isDefault    Boolean  @default(false)
+  sortOrder    Int      @default(0)
+  updatedBy    String
+  updatedAt    DateTime @updatedAt
+
+  @@map("metric_permissions")
+}
+
+model CronConfig {
+  id         String    @id @default("singleton")
+  enabled    Boolean   @default(true)
+  frequency  String    @default("daily")
+  runHour    Int       @default(2)
+  dateRange  String    @default("month")
+  lastRunAt  DateTime?
+  lastResult String?   // Json stored as string
+  updatedAt  DateTime  @updatedAt
+
+  @@map("cron_config")
+}
+
+model CronChannelConfig {
+  id        String   @id @default(uuid())
+  channelId String   @unique
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@map("cron_channel_configs")
+}
+
+model CronLog {
+  id                String   @id @default(uuid())
+  runAt             DateTime @default(now())
+  status            String
+  skipReason        String?
+  channelsSynced    Int      @default(0)
+  videosSynced      Int      @default(0)
+  snapshotsUpserted Int      @default(0)
+  errors            String   @default("[]") // String[] stored as JSON
+  durationMs        Int?
+
+  @@index([runAt])
+  @@map("cron_logs")
+}
+
+model ChannelTrackerConfig {
+  id        String   @id @default(uuid())
+  channelId String   @unique
+  data      String   @default("[]") // Json stored as string
+  updatedAt DateTime @updatedAt
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@map("channel_tracker_configs")
+}
+
+model YoutubeOAuthToken {
+  id            String   @id @default(uuid())
+  channelId     String
+  accessToken   String
+  refreshToken  String
+  expiresAt     DateTime
+  scope         String
+  ytChannelId   String?
+  ytChannelName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  channels Channel[]
+
+  @@index([channelId])
+  @@map("youtube_oauth_tokens")
+}

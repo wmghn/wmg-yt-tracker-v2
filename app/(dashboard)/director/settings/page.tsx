@@ -2,6 +2,7 @@ import { requireRole } from "@/lib/auth";
 import { Settings } from "lucide-react";
 import { PermissionsTable } from "./permissions-table";
 import { CronSettings } from "./cron-settings";
+import { DbProviderStatus } from "./db-provider-status";
 import { db } from "@/lib/db";
 import type { Metric } from "@prisma/client";
 
@@ -31,6 +32,19 @@ export default async function SettingsPage() {
           </p>
         </div>
         <PermissionsTable initialMatrix={matrix} />
+      </div>
+
+      {/* Database Provider */}
+      <div className="rounded-xl border bg-white shadow-sm">
+        <div className="border-b px-5 py-4">
+          <h2 className="text-base font-semibold text-zinc-900">Cơ sở dữ liệu</h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            Hiển thị database đang dùng. Có thể chuyển sang SQLite local khi không có Supabase.
+          </p>
+        </div>
+        <div className="px-5 py-5">
+          <DbProviderStatus />
+        </div>
       </div>
 
       {/* Cron Job Settings */}

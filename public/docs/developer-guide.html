@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WMG YouTube Tracker v2 — Developer Guide</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3248;
+      --text: #e2e6f0;
+      --muted: #7a82a0;
+      --accent: #6366f1;
+      --accent2: #8b5cf6;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --cyan: #06b6d4;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    /* ── Layout ── */
+    .sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0;
+      width: 240px; background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto; padding: 24px 0;
+      z-index: 100;
+    }
+    .sidebar-logo {
+      padding: 0 20px 20px;
+      font-size: 15px; font-weight: 700;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+    .sidebar-logo span { color: var(--accent); }
+    .sidebar-section { padding: 6px 20px 4px; font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-top: 12px; }
+    .sidebar a {
+      display: block; padding: 7px 20px;
+      color: var(--muted); text-decoration: none; font-size: 13px;
+      border-left: 2px solid transparent;
+      transition: all .15s;
+    }
+    .sidebar a:hover { color: var(--text); background: var(--surface2); border-left-color: var(--accent); }
+    .main { margin-left: 240px; padding: 48px 56px; max-width: 1100px; }
+
+    /* ── Typography ── */
+    h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
+    h2 { font-size: 20px; font-weight: 700; margin: 40px 0 16px; padding-top: 40px; border-top: 1px solid var(--border); }
+    h2:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+    h3 { font-size: 15px; font-weight: 700; margin: 24px 0 10px; color: var(--accent); }
+    h4 { font-size: 13px; font-weight: 600; margin: 16px 0 6px; color: var(--text); }
+    p { color: var(--muted); margin-bottom: 10px; }
+    code {
+      font-family: "JetBrains Mono", "Fira Code", "Menlo", monospace;
+      font-size: 12px; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 4px;
+      padding: 1px 5px; color: var(--cyan);
+    }
+    pre {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 16px; overflow-x: auto;
+      font-family: "JetBrains Mono", "Fira Code", monospace;
+      font-size: 12px; line-height: 1.7; margin: 10px 0 16px;
+      color: var(--text);
+    }
+    pre .k { color: #c792ea; }
+    pre .s { color: #c3e88d; }
+    pre .c { color: #546e7a; font-style: italic; }
+    pre .n { color: #82aaff; }
+    pre .t { color: var(--cyan); }
+    pre .m { color: #f78c6c; }
+
+    /* ── Components ── */
+    .hero {
+      background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
+      border: 1px solid var(--border); border-radius: 12px;
+      padding: 32px 36px; margin-bottom: 40px;
+    }
+    .hero-sub { color: var(--muted); font-size: 15px; margin-top: 6px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    }
+    .badge-purple { background: #2d2458; color: var(--accent); border: 1px solid #3d3480; }
+    .badge-green { background: #0d2e22; color: var(--green); border: 1px solid #164f39; }
+    .badge-amber { background: #2e2008; color: var(--amber); border: 1px solid #4a3410; }
+    .badge-red { background: #2e0d0d; color: var(--red); border: 1px solid #4a1a1a; }
+    .badge-blue { background: #0d1e35; color: var(--blue); border: 1px solid #1a3560; }
+    .badge-cyan { background: #041e26; color: var(--cyan); border: 1px solid #0c3d50; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 16px 0; }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 18px 20px;
+    }
+    .card h4 { color: var(--accent); margin-top: 0; font-size: 13px; }
+    .card p { font-size: 12px; margin-bottom: 0; }
+
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; }
+    th {
+      background: var(--surface2); text-align: left;
+      padding: 10px 14px; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em;
+      color: var(--muted); border-bottom: 1px solid var(--border);
+    }
+    td { padding: 9px 14px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,.02); }
+    td code { font-size: 11px; }
+
+    .flow {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 24px 28px; margin: 16px 0;
+      font-family: "JetBrains Mono", monospace; font-size: 12px; line-height: 2;
+    }
+    .flow-step { display: flex; align-items: flex-start; gap: 12px; margin: 4px 0; }
+    .flow-num {
+      min-width: 22px; height: 22px; background: var(--accent);
+      border-radius: 50%; font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      color: white; margin-top: 1px; flex-shrink: 0;
+    }
+    .flow-text { color: var(--text); }
+    .flow-arrow { color: var(--muted); margin: 2px 0 2px 34px; font-size: 12px; }
+    .flow-sub { color: var(--muted); font-size: 11px; margin-left: 34px; }
+
+    .env-table { font-size: 12px; }
+    .env-table td:first-child { color: var(--cyan); font-family: monospace; font-weight: 600; font-size: 12px; }
+    .env-table td:nth-child(2) { color: var(--red); font-size: 11px; min-width: 70px; }
+
+    .route-group { margin-bottom: 24px; }
+    .route-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; margin: 3px 0; }
+    .route-row:hover { background: var(--surface2); }
+    .method { font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 4px; min-width: 42px; text-align: center; letter-spacing: .04em; }
+    .method-get { background: #0d2e22; color: var(--green); }
+    .method-post { background: #0d1e35; color: var(--blue); }
+    .method-put, .method-patch { background: #2e2008; color: var(--amber); }
+    .method-delete { background: #2e0d0d; color: var(--red); }
+    .route-path { font-family: monospace; font-size: 12px; color: var(--text); }
+    .route-desc { color: var(--muted); font-size: 12px; margin-left: auto; }
+
+    .model-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .model-name { font-size: 16px; font-weight: 700; color: var(--text); }
+    .model-table-name { font-size: 11px; color: var(--muted); font-family: monospace; }
+
+    .tag { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 600; }
+    .tag-pk { background: #2e1f05; color: #fbbf24; }
+    .tag-fk { background: #0d1e35; color: var(--blue); }
+    .tag-uk { background: #1a1040; color: var(--accent2); }
+    .tag-idx { background: #0d2015; color: var(--green); }
+
+    .section-intro { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+
+    .info-box {
+      background: #0d1e35; border: 1px solid #1a3560;
+      border-radius: 8px; padding: 14px 18px; margin: 12px 0;
+      font-size: 13px; color: var(--text);
+    }
+    .info-box.warning { background: #2a1800; border-color: #4a3010; }
+    .info-box .label { font-weight: 700; color: var(--blue); margin-right: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+    .info-box.warning .label { color: var(--amber); }
+
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; padding: 24px 20px; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="sidebar-logo">WMG YT Tracker <span>v2</span></div>
+  <div class="sidebar-section">Overview</div>
+  <a href="#overview">Giới thiệu hệ thống</a>
+  <a href="#tech-stack">Tech Stack</a>
+  <a href="#env-vars">Environment Variables</a>
+  <div class="sidebar-section">Data Layer</div>
+  <a href="#database">Database & Connection</a>
+  <a href="#models">Data Models</a>
+  <a href="#models-user">· User</a>
+  <a href="#models-channel">· Channel</a>
+  <a href="#models-video">· Video</a>
+  <a href="#models-analytics">· AnalyticsSnapshot</a>
+  <a href="#models-sync">· SyncJob</a>
+  <a href="#models-payroll">· Payroll</a>
+  <a href="#models-other">· Other Models</a>
+  <div class="sidebar-section">API</div>
+  <a href="#api-auth">Auth & OAuth</a>
+  <a href="#api-channels">Channels</a>
+  <a href="#api-videos">Videos</a>
+  <a href="#api-analytics">Analytics</a>
+  <a href="#api-payroll">Payroll</a>
+  <a href="#api-admin">Admin</a>
+  <div class="sidebar-section">Flows</div>
+  <a href="#flow-auth">Auth Flow</a>
+  <a href="#flow-sync">Sync Flow</a>
+  <a href="#flow-local">Local Dev Sync</a>
+  <a href="#flow-payroll">Payroll Flow</a>
+  <div class="sidebar-section">Frontend</div>
+  <a href="#pages">Page Structure</a>
+  <a href="#roles">Role Permissions</a>
+</nav>
+
+<!-- Main content -->
+<main class="main">
+
+  <!-- Hero -->
+  <div class="hero">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+      <span class="badge badge-purple">Next.js 14</span>
+      <span class="badge badge-green">PostgreSQL</span>
+      <span class="badge badge-cyan">YouTube API</span>
+      <span class="badge badge-amber">Netlify</span>
+    </div>
+    <h1>WMG YouTube Tracker v2</h1>
+    <p class="hero-sub">Hệ thống theo dõi views YouTube, phân tích hiệu suất nhân sự, và tính lương theo kênh.</p>
+  </div>
+
+  <!-- ─── Overview ───────────────────────────────────── -->
+  <h2 id="overview">Giới thiệu hệ thống</h2>
+  <p class="section-intro">Ứng dụng quản lý kênh YouTube cho team nội dung — từ tracking views, phân tích nhân sự đến tính lương tự động.</p>
+
+  <div class="grid-3">
+    <div class="card">
+      <h4>3 Roles</h4>
+      <p>DIRECTOR, MANAGER, STAFF — mỗi role có quyền truy cập và tính năng riêng.</p>
+    </div>
+    <div class="card">
+      <h4>Multi-channel</h4>
+      <p>Mỗi kênh YouTube được OAuth riêng, sync dữ liệu độc lập.</p>
+    </div>
+    <div class="card">
+      <h4>Analytics Sync</h4>
+      <p>Pull dữ liệu từ YouTube Analytics API v2, lưu vào PostgreSQL theo date range.</p>
+    </div>
+  </div>
+
+  <!-- ─── Tech Stack ─────────────────────────────────── -->
+  <h2 id="tech-stack">Tech Stack</h2>
+  <table>
+    <thead><tr><th>Layer</th><th>Technology</th><th>Version</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Framework</td><td>Next.js (App Router)</td><td>14.2</td><td>SSR + API Routes</td></tr>
+      <tr><td>Language</td><td>TypeScript</td><td>5.9</td><td>Strict mode</td></tr>
+      <tr><td>ORM</td><td>Prisma</td><td>7.5</td><td>PrismaPg adapter (native <code>pg</code>)</td></tr>
+      <tr><td>Database</td><td>PostgreSQL</td><td>15+</td><td>Hosted trên Supabase</td></tr>
+      <tr><td>Auth</td><td>NextAuth v5</td><td>5.0-beta</td><td>JWT strategy, bcryptjs passwords</td></tr>
+      <tr><td>UI</td><td>Tailwind + Radix UI</td><td>3.4 / latest</td><td>Dark-mode ready</td></tr>
+      <tr><td>Charts</td><td>Recharts</td><td>3.8</td><td>BarChart, ResponsiveContainer</td></tr>
+      <tr><td>Excel</td><td>xlsx (SheetJS)</td><td>0.18</td><td>Export sample data</td></tr>
+      <tr><td>Validation</td><td>Zod + react-hook-form</td><td>4.3 / 7.7</td><td>Form + API validation</td></tr>
+      <tr><td>Notifications</td><td>Sonner</td><td>2.0</td><td>Toast system</td></tr>
+      <tr><td>Deployment</td><td>Netlify + Background Functions</td><td>–</td><td>Long-running sync jobs (15 min)</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ─── Environment Variables ──────────────────────── -->
+  <h2 id="env-vars">Environment Variables</h2>
+  <p class="section-intro">Copy <code>.env.example</code> → <code>.env.local</code> và điền giá trị.</p>
+  <table class="env-table">
+    <thead><tr><th>Variable</th><th>Required</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>DATABASE_URL</td><td><span class="badge badge-red">required</span></td><td>PostgreSQL connection string (pooled — qua PgBouncer trên Supabase)</td></tr>
+      <tr><td>DIRECT_URL</td><td><span class="badge badge-red">required</span></td><td>Direct connection — dùng cho Prisma migrations (<code>prisma migrate dev</code>)</td></tr>
+      <tr><td>NEXTAUTH_SECRET</td><td><span class="badge badge-red">required</span></td><td>Random string 32+ chars để ký JWT. Dùng <code>openssl rand -hex 32</code></td></tr>
+      <tr><td>NEXTAUTH_URL</td><td><span class="badge badge-red">required</span></td><td>URL gốc của app, VD: <code>http://localhost:3000</code></td></tr>
+      <tr><td>YOUTUBE_API_KEY</td><td><span class="badge badge-red">required</span></td><td>YouTube Data API v3 key (Google Cloud Console) — fetch metadata video</td></tr>
+      <tr><td>YOUTUBE_CLIENT_ID</td><td><span class="badge badge-red">required</span></td><td>Google OAuth 2.0 Client ID — cho phép kênh uỷ quyền truy cập analytics</td></tr>
+      <tr><td>YOUTUBE_CLIENT_SECRET</td><td><span class="badge badge-red">required</span></td><td>Google OAuth 2.0 Client Secret</td></tr>
+      <tr><td>ENCRYPTION_KEY</td><td><span class="badge badge-red">required</span></td><td>Hex string 64 chars (32 bytes) — mã hoá <code>accessToken</code> và <code>refreshToken</code> trong DB</td></tr>
+      <tr><td>INTERNAL_SYNC_SECRET</td><td><span class="badge badge-amber">local</span></td><td>Secret xác thực giữa Next.js API và Netlify Background Function. VD: <code>yt-sync-internal-dev-2026</code></td></tr>
+      <tr><td>CRON_SECRET</td><td><span class="badge badge-blue">optional</span></td><td>Bearer token cho cron job <code>/api/cron/sync-views</code></td></tr>
+      <tr><td>NETLIFY_URL</td><td><span class="badge badge-blue">auto</span></td><td>Tự set bởi Netlify. Dùng để gọi background function URL</td></tr>
+      <tr><td>NETLIFY</td><td><span class="badge badge-blue">auto</span></td><td>Set là <code>"true"</code> bởi Netlify — dùng để detect môi trường</td></tr>
+    </tbody>
+  </table>
+
+  <div class="info-box warning">
+    <span class="label">⚠ Chú ý</span>
+    Ở <strong>local dev</strong> (<code>next dev</code>), sync chạy trực tiếp trong Node.js process (không qua Netlify Background Function). Biến <code>NETLIFY</code> không được set nên hệ thống tự detect và chạy inline.
+  </div>
+
+  <!-- ─── Database ────────────────────────────────────── -->
+  <h2 id="database">Database & Connection</h2>
+  <p class="section-intro">PostgreSQL hosted trên <strong>Supabase</strong>, kết nối qua Prisma với <code>@prisma/adapter-pg</code>.</p>
+
+  <pre><span class="k">// lib/db/index.ts</span>
+<span class="k">import</span> { PrismaClient } <span class="k">from</span> <span class="s">"@prisma/client"</span>
+<span class="k">import</span> { PrismaPg } <span class="k">from</span> <span class="s">"@prisma/adapter-pg"</span>
+<span class="k">import</span> { Pool } <span class="k">from</span> <span class="s">"pg"</span>
+
+<span class="c">// Singleton pattern — tránh tạo nhiều connection trong hot reload</span>
+<span class="k">const</span> pool = <span class="k">new</span> Pool({ connectionString: process.env.DATABASE_URL })
+<span class="k">const</span> adapter = <span class="k">new</span> PrismaPg(pool)
+<span class="k">export const</span> db = <span class="k">new</span> PrismaClient({ adapter })</pre>
+
+  <div class="grid-2">
+    <div class="card">
+      <h4>Commands</h4>
+      <p style="font-family:monospace;font-size:12px;color:#82aaff;line-height:2.2;">
+        npm run db:migrate<br/>
+        npm run db:push<br/>
+        npm run db:studio<br/>
+        npm run db:seed
+      </p>
+    </div>
+    <div class="card">
+      <h4>Supabase lưu ý</h4>
+      <p>Dùng <code>DATABASE_URL</code> (pooled) cho runtime, <code>DIRECT_URL</code> (direct) cho migrations. Nếu dùng cùng 1 URL sẽ lỗi migration timeout.</p>
+    </div>
+  </div>
+
+  <!-- ─── Models ─────────────────────────────────────── -->
+  <h2 id="models">Data Models</h2>
+  <p class="section-intro">12 models chính trong Prisma Schema. Legend: <span class="tag tag-pk">PK</span> Primary Key &nbsp; <span class="tag tag-fk">FK</span> Foreign Key &nbsp; <span class="tag tag-uk">UK</span> Unique &nbsp; <span class="tag tag-idx">IDX</span> Index</p>
+
+  <!-- User -->
+  <h3 id="models-user">User <span style="font-weight:400;color:var(--muted);font-size:13px;margin-left:8px;">→ table: <code>users</code></span></h3>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Flags</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>id</code></td><td>UUID</td><td><span class="tag tag-pk">PK</span></td><td>Auto UUID</td></tr>
+      <tr><td><code>name</code></td><td>String</td><td></td><td>Họ tên</td></tr>
+      <tr><td><code>email</code></td><td>String</td><td><span class="tag tag-uk">UK</span></td><td>Email đăng nhập</td></tr>
+      <tr><td><code>password</code></td><td>String</td><td></td><td>bcrypt hash</td></tr>
+      <tr><td><code>role</code></td><td>UserRole</td><td></td><td><code>DIRECTOR</code> | <code>MANAGER</code> | <code>STAFF</code></td></tr>
+      <tr><td><code>baseSalary</code></td><td>Decimal</td><td></td><td>Lương cơ bản</td></tr>
+      <tr><td><code>isActive</code></td><td>Boolean</td><td></td><td>Default: true. Khi false, user không thể đăng nhập</td></tr>
+      <tr><td><code>createdAt / updatedAt</code></td><td>DateTime</td><td></td><td>Auto-managed</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Channel -->
+  <h3 id="models-channel">Channel <span style="font-weight:400;color:var(--muted);font-size:13px;margin-left:8px;">→ table: <code>channels</code></span></h3>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Flags</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>id</code></td><td>UUID</td><td><span class="tag tag-pk">PK</span></td><td></td></tr>
+      <tr><td><code>youtubeChannelId</code></td><td>String</td><td><span class="tag tag-uk">UK</span></td><td>ID kênh YouTube (UCxxxx…)</td></tr>
+      <tr><td><code>name</code></td><td>String</td><td></td><td>Tên kênh</td></tr>
+      <tr><td><code>status</code></td><td>ChannelStatus</td><td><span class="tag tag-idx">IDX</span></td><td><code>ACTIVE</code> | <code>INACTIVE</code> | <code>PENDING_BKT</code></td></tr>
+      <tr><td><code>managerId</code></td><td>UUID</td><td><span class="tag tag-fk">FK</span> → User</td><td>Manager phụ trách kênh</td></tr>
+      <tr><td><code>oauthTokenId</code></td><td>UUID</td><td><span class="tag tag-fk">FK</span> → YoutubeOAuthToken</td><td>Token OAuth kết nối kênh</td></tr>
+      <tr><td><code>createdBy</code></td><td>UUID</td><td><span class="tag tag-fk">FK</span> → User</td><td>Người tạo kênh</td></tr>
+    </tbody>
+  </table>
+
+  <h4>YoutubeOAuthToken → table: <code>youtube_oauth_tokens</code></h4>
+  <table>
+    <thead><tr><th>Field</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>accessToken</code></td><td>Encrypted, dùng để gọi YouTube API</td></tr>
+      <tr><td><code>refreshToken</code></td><td>Encrypted, dùng để refresh khi accessToken hết hạn</td></tr>
+      <tr><td><code>expiresAt</code></td><td>Thời điểm accessToken hết hạn. Hệ thống tự refresh nếu còn &lt; 60s</td></tr>
+      <tr><td><code>ytChannelId</code></td><td>Channel ID thực tế từ Google (dùng cho brand channels)</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Video -->
+  <h3 id="models-video">Video <span style="font-weight:400;color:var(--muted);font-size:13px;margin-left:8px;">→ table: <code>videos</code></span></h3>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Flags</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>id</code></td><td>UUID</td><td><span class="tag tag-pk">PK</span></td><td>Internal ID</td></tr>
+      <tr><td><code>youtubeVideoId</code></td><td>String</td><td><span class="tag tag-uk">UK</span></td><td>YouTube video ID (11 chars, VD: <code>dQw4w9WgXcQ</code>)</td></tr>
+      <tr><td><code>channelId</code></td><td>UUID</td><td><span class="tag tag-fk">FK</span> <span class="tag tag-idx">IDX</span></td><td>Kênh sở hữu video</td></tr>
+      <tr><td><code>title</code></td><td>String</td><td></td><td>Tiêu đề (sync từ YouTube)</td></tr>
+      <tr><td><code>thumbnailUrl</code></td><td>String?</td><td></td><td>URL thumbnail</td></tr>
+      <tr><td><code>publishedAt</code></td><td>DateTime?</td><td></td><td>Ngày phát hành</td></tr>
+      <tr><td><code>isActive</code></td><td>Boolean</td><td></td><td>Có còn track không</td></tr>
+      <tr><td><code>submittedBy</code></td><td>UUID</td><td><span class="tag tag-fk">FK</span></td><td>Nhân sự đã khai báo video</td></tr>
+    </tbody>
+  </table>
+
+  <h4>VideoRoleAssignment → table: <code>video_role_assignments</code></h4>
+  <p>Ghi nhận <strong>ai làm gì</strong> với mỗi video (Content Writer hoặc Editor).</p>
+  <table>
+    <thead><tr><th>Field</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>videoId + userId + role</code></td><td><span class="tag tag-uk">UK</span> — 1 người chỉ có 1 role / video</td></tr>
+      <tr><td><code>role</code></td><td><code>WRITER</code> | <code>EDITOR</code></td></tr>
+      <tr><td><code>status</code></td><td><code>PENDING</code> → <code>APPROVED</code> | <code>REJECTED</code></td></tr>
+      <tr><td><code>approvedBy / approvedAt</code></td><td>Director/Manager duyệt assignment</td></tr>
+    </tbody>
+  </table>
+
+  <!-- AnalyticsSnapshot -->
+  <h3 id="models-analytics">AnalyticsSnapshot <span style="font-weight:400;color:var(--muted);font-size:13px;margin-left:8px;">→ table: <code>analytics_snapshots</code></span></h3>
+  <p>Đây là bảng trung tâm của toàn bộ analytics. Mỗi row = 1 video × 1 date range.</p>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>videoId</code></td><td>UUID FK</td><td>Video</td></tr>
+      <tr><td><code>startDate</code></td><td>Date</td><td>Ngày bắt đầu của range (VD: 2026-02-21)</td></tr>
+      <tr><td><code>date</code></td><td>Date</td><td>Ngày kết thúc (end date)</td></tr>
+      <tr><td><code>views</code></td><td>BigInt</td><td>Tổng views trong range</td></tr>
+      <tr><td><code>estimatedMinutesWatched</code></td><td>Decimal</td><td>Phút xem ước tính</td></tr>
+      <tr><td><code>averageViewDuration</code></td><td>Decimal</td><td>Thời gian xem trung bình (giây)</td></tr>
+      <tr><td><code>estimatedRevenue</code></td><td>Decimal</td><td>Doanh thu ước tính (USD)</td></tr>
+      <tr><td><code>cpm / impressionCTR</code></td><td>Decimal</td><td>CPM và tỷ lệ click impression</td></tr>
+      <tr><td><code>fetchedAt</code></td><td>DateTime</td><td><strong>Quan trọng:</strong> Thời điểm pull từ YouTube. Dùng để tính <code>lastSyncedAt</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="info-box">
+    <span class="label">ℹ Unique key</span>
+    <code>(videoId, startDate, date)</code> — mỗi video chỉ có 1 snapshot cho mỗi date range. Khi sync lại, dữ liệu được <strong>upsert</strong> (cập nhật nếu đã tồn tại).
+  </div>
+  <div class="info-box">
+    <span class="label">ℹ lastSyncedAt</span>
+    Không lưu trực tiếp trong DB. Được tính là <code>MAX(fetchedAt)</code> từ tất cả snapshots matching date range hiện tại → filter-aware (28 ngày có lastSyncedAt riêng, 90 ngày có riêng).
+  </div>
+
+  <!-- SyncJob -->
+  <h3 id="models-sync">SyncJob <span style="font-weight:400;color:var(--muted);font-size:13px;margin-left:8px;">→ table: <code>sync_jobs</code></span></h3>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>id</code></td><td>UUID PK</td><td>JobID trả về cho client để poll</td></tr>
+      <tr><td><code>status</code></td><td>String</td><td><code>pending</code> → <code>running</code> → <code>done</code> | <code>error</code></td></tr>
+      <tr><td><code>channelIds</code></td><td>String[]</td><td>Danh sách channel IDs cần sync. Rỗng = tất cả</td></tr>
+      <tr><td><code>dateRange</code></td><td>String</td><td>VD: <code>28days</code>, <code>90days</code>, <code>month</code></td></tr>
+      <tr><td><code>month / year</code></td><td>Int?</td><td>Dùng khi dateRange = <code>month</code> hoặc <code>year</code></td></tr>
+      <tr><td><code>result</code></td><td>JSON</td><td><code>{ channelsSynced, videosSynced, snapshotsUpserted, errors[] }</code></td></tr>
+    </tbody>
+  </table>
+
+  <!-- Payroll -->
+  <h3 id="models-payroll">Payroll Models</h3>
+  <div class="grid-2">
+    <div class="card">
+      <h4>ChannelWeightConfig → <code>channel_weight_configs</code></h4>
+      <p>Tỷ lệ phân chia views theo role. VD: WRITER = 40%, EDITOR = 60%.</p>
+      <p>Unique: <code>(channelId, role, effectiveFrom)</code> — có thể thay đổi theo thời gian.</p>
+    </div>
+    <div class="card">
+      <h4>SalaryConfig → <code>salary_configs</code></h4>
+      <p>Cấu hình lương cho từng nhân sự: baseSalary + bonusPerThousandViews.</p>
+      <p>Có lịch sử (<code>effectiveFrom</code>) — tính lương đúng kỳ.</p>
+    </div>
+    <div class="card">
+      <h4>PayrollPeriod → <code>payroll_periods</code></h4>
+      <p>Kỳ lương (tháng/năm). Unique <code>(month, year)</code>. Có thể lock để tránh thay đổi.</p>
+    </div>
+    <div class="card">
+      <h4>PayrollRecord → <code>payroll_records</code></h4>
+      <p>Kết quả tính lương: <code>baseSalary + totalBonus = totalSalary</code>. Lưu <code>detail</code> JSON để audit.</p>
+    </div>
+  </div>
+
+  <!-- Other Models -->
+  <h3 id="models-other">Other Models</h3>
+  <table>
+    <thead><tr><th>Model</th><th>Table</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>ChannelMember</code></td><td><code>channel_members</code></td><td>Nhân sự nào thuộc kênh nào. Unique <code>(channelId, userId)</code></td></tr>
+      <tr><td><code>VideoViewsLog</code></td><td><code>video_views_log</code></td><td>Lịch sử views theo thời gian (view count snapshot cũ, nay dùng AnalyticsSnapshot)</td></tr>
+      <tr><td><code>PermissionConfig</code></td><td><code>permission_configs</code></td><td>Metric nào role nào được xem (REVENUE chỉ DIRECTOR, etc.)</td></tr>
+      <tr><td><code>MetricPermission</code></td><td><code>metric_permissions</code></td><td>Cấu hình UI hiển thị metric nào, label ra sao</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ─── API Routes ──────────────────────────────────── -->
+  <h2 id="api-auth">API — Auth & OAuth</h2>
+
+  <div class="route-group">
+    <div class="route-row">
+      <span class="method method-post">POST</span>
+      <span class="route-path">/api/auth/[...nextauth]</span>
+      <span class="route-desc">NextAuth.js handler (login, session, signout)</span>
+    </div>
+    <div class="route-row">
+      <span class="method method-get">GET</span>
+      <span class="route-path">/api/oauth/youtube/callback</span>
+      <span class="route-desc">Callback OAuth Google → lưu token kênh</span>
+    </div>
+  </div>
+
+  <h2 id="api-channels">API — Channels</h2>
+  <div class="route-group">
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/channels</span><span class="route-desc">Danh sách kênh (theo role)</span></div>
+    <div class="route-row"><span class="method method-post">POST</span><span class="route-path">/api/channels</span><span class="route-desc">Tạo kênh mới</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/channels/[id]</span><span class="route-desc">Chi tiết 1 kênh</span></div>
+    <div class="route-row"><span class="method method-patch">PATCH</span><span class="route-path">/api/channels/[id]</span><span class="route-desc">Cập nhật kênh</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/channels/[id]/members</span><span class="route-desc">Danh sách thành viên kênh</span></div>
+    <div class="route-row"><span class="method method-post">POST</span><span class="route-path">/api/channels/[id]/members</span><span class="route-desc">Thêm thành viên vào kênh</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/channels/[id]/weights</span><span class="route-desc">Tỷ lệ weight theo role</span></div>
+    <div class="route-row"><span class="method method-post">POST</span><span class="route-path">/api/channels/[id]/weights</span><span class="route-desc">Cập nhật weight</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/channels/[id]/oauth</span><span class="route-desc">Trạng thái OAuth kênh</span></div>
+  </div>
+
+  <h2 id="api-videos">API — Videos</h2>
+  <div class="route-group">
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/videos</span><span class="route-desc">Danh sách videos (filter theo role)</span></div>
+    <div class="route-row"><span class="method method-post">POST</span><span class="route-path">/api/videos</span><span class="route-desc">Tạo/khai báo video mới</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/videos/[id]</span><span class="route-desc">Chi tiết video</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/videos/[id]/roles</span><span class="route-desc">Assignments (ai làm gì)</span></div>
+    <div class="route-row"><span class="method method-post">POST</span><span class="route-path">/api/videos/[id]/approve</span><span class="route-desc">Duyệt role assignment</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/videos/preview</span><span class="route-desc">Preview metadata từ YouTube Video ID</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/videos/lookup</span><span class="route-desc">Tìm video theo keyword</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/views/sync</span><span class="route-desc">Sync views thủ công (legacy)</span></div>
+  </div>
+
+  <h2 id="api-analytics">API — Analytics</h2>
+  <div class="route-group">
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/analytics/channel-analytics</span><span class="route-desc">Analytics theo kênh + date range → KPI, topVideos, staffBreakdown, lastSyncedAt</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/analytics/staff-analytics</span><span class="route-desc">Analytics cá nhân nhân sự (summary, channels)</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/analytics/team-analytics</span><span class="route-desc">Phân tích từng thành viên trong kênh</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/analytics/overview</span><span class="route-desc">Tổng quan toàn hệ thống (DIRECTOR only)</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/analytics/my-stats</span><span class="route-desc">Stats cá nhân (STAFF)</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/analytics/views-trend</span><span class="route-desc">Trend views theo thời gian</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/analytics/top-performers</span><span class="route-desc">Top nhân sự theo views</span></div>
+    <div class="route-row"><span class="method method-post">POST</span><span class="route-path">/api/analytics/sync</span><span class="route-desc">Bắt đầu sync job → trả về <code>{ jobId }</code></span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/analytics/sync/status?jobId=</span><span class="route-desc">Poll trạng thái job sync</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/analytics/available-metrics</span><span class="route-desc">Metrics user được phép xem</span></div>
+  </div>
+
+  <h2 id="api-payroll">API — Payroll</h2>
+  <div class="route-group">
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/payroll/periods</span><span class="route-desc">Danh sách kỳ lương</span></div>
+    <div class="route-row"><span class="method method-post">POST</span><span class="route-path">/api/payroll/periods</span><span class="route-desc">Tạo kỳ lương mới</span></div>
+    <div class="route-row"><span class="method method-post">POST</span><span class="route-path">/api/payroll/periods/[id]/calculate</span><span class="route-desc">Tính lương cho kỳ</span></div>
+    <div class="route-row"><span class="method method-post">POST</span><span class="route-path">/api/payroll/periods/[id]/lock</span><span class="route-desc">Khoá kỳ lương</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/payroll/periods/[id]/records</span><span class="route-desc">Chi tiết bảng lương kỳ</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/payroll/my-salary</span><span class="route-desc">Lương của mình (STAFF)</span></div>
+  </div>
+
+  <h2 id="api-admin">API — Admin</h2>
+  <div class="route-group">
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/admin/metric-permissions</span><span class="route-desc">Cấu hình metric visibility</span></div>
+    <div class="route-row"><span class="method method-patch">PATCH</span><span class="route-path">/api/admin/metric-permissions</span><span class="route-desc">Cập nhật quyền xem metric</span></div>
+    <div class="route-row"><span class="method method-get">GET</span><span class="route-path">/api/cron/sync-views</span><span class="route-desc">Cron job tự động sync (cần <code>CRON_SECRET</code>)</span></div>
+  </div>
+
+  <!-- ─── Flows ───────────────────────────────────────── -->
+  <h2 id="flow-auth">Flow — Authentication</h2>
+  <div class="flow">
+    <div class="flow-step"><div class="flow-num">1</div><div class="flow-text">User nhập email + password tại <code>/login</code></div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">2</div><div class="flow-text">NextAuth <code>CredentialsProvider</code> verify bcrypt hash từ DB</div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">3</div><div class="flow-text">JWT được tạo chứa <code>{ id, email, role }</code></div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">4</div><div class="flow-text">Redirect đến <code>/dashboard</code> → server component đọc session</div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">5</div><div class="flow-text">Redirect theo role: DIRECTOR → <code>/director/analytics</code>, MANAGER → <code>/manager/analytics</code>, STAFF → <code>/staff/analytics</code></div></div>
+  </div>
+
+  <h2 id="flow-sync">Flow — YouTube Analytics Sync (Production / Netlify)</h2>
+  <div class="flow">
+    <div class="flow-step"><div class="flow-num">1</div><div class="flow-text">User bấm "Cập nhật từ YouTube" trên UI</div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">2</div><div class="flow-text"><code>POST /api/analytics/sync</code> — tạo SyncJob (<code>status: "pending"</code>), trả về <code>{ jobId }</code> ngay lập tức (HTTP 202)</div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">3</div><div class="flow-text">Server fire-and-forget đến <code>/.netlify/functions/sync-background</code> với jobId + secret</div></div>
+    <div class="flow-sub">↳ Netlify Background Function chạy tối đa 15 phút, không block response</div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">4</div><div class="flow-text">Background function cập nhật job → <code>status: "running"</code></div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">5</div><div class="flow-text">Gọi <code>syncAnalyticsSnapshots()</code>: lấy token → gọi YouTube Analytics API v2 → upsert <code>AnalyticsSnapshot</code></div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">6</div><div class="flow-text">Cập nhật job → <code>status: "done"</code> với result JSON</div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">7</div><div class="flow-text">Client (SyncButton) poll <code>GET /api/analytics/sync/status?jobId=xxx</code> mỗi 3 giây → nhận "done" → refresh data</div></div>
+  </div>
+
+  <h2 id="flow-local">Flow — Local Dev Sync</h2>
+  <p class="section-intro">Khi <code>process.env.NETLIFY</code> không được set, sync chạy inline trong Node.js.</p>
+  <div class="flow">
+    <div class="flow-step"><div class="flow-num">1</div><div class="flow-text"><code>POST /api/analytics/sync</code> — tạo SyncJob, detect <code>!NETLIFY</code></div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">2</div><div class="flow-text">Trả về <code>{ jobId }</code> HTTP 202 ngay, đồng thời khởi động async IIFE (fire-and-forget)</div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">3</div><div class="flow-text">IIFE update job → <code>"running"</code> → gọi <code>syncAnalyticsSnapshots()</code> → update <code>"done"</code></div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">4</div><div class="flow-text">Client poll như bình thường cho đến khi nhận "done"</div></div>
+  </div>
+
+  <h2 id="flow-payroll">Flow — Tính Lương</h2>
+  <div class="flow">
+    <div class="flow-step"><div class="flow-num">1</div><div class="flow-text">Director tạo PayrollPeriod (tháng/năm)</div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">2</div><div class="flow-text"><code>POST /api/payroll/periods/[id]/calculate</code> — đọc tất cả VideoRoleAssignment (APPROVED) trong kỳ</div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">3</div><div class="flow-text">Tính views cho mỗi video: <code>AnalyticsSnapshot.views</code> cho date range của kỳ</div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">4</div><div class="flow-text">Phân chia theo role weight: WRITER nhận 40% views/video, EDITOR nhận 60% / số editors</div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">5</div><div class="flow-text">Tính bonus: <code>totalViews / 1000 × bonusPerThousandViews</code></div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">6</div><div class="flow-text">Tạo <code>PayrollRecord</code> cho từng nhân sự với detail JSON đầy đủ</div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="flow-num">7</div><div class="flow-text">Director lock kỳ lương → không thể thay đổi sau đó</div></div>
+  </div>
+
+  <!-- ─── Frontend Pages ─────────────────────────────── -->
+  <h2 id="pages">Frontend — Page Structure</h2>
+  <pre><span class="n">app/</span>
+├── <span class="t">(auth)/</span>
+│   └── login/                    <span class="c"># Trang đăng nhập</span>
+│
+├── <span class="t">dashboard/page.tsx</span>            <span class="c"># Redirect theo role (server component)</span>
+│
+└── <span class="t">(dashboard)/</span>                   <span class="c"># Shared layout: sidebar + header</span>
+    ├── director/
+    │   ├── page.tsx              <span class="c"># KPI tổng quan</span>
+    │   ├── analytics/page.tsx    <span class="c"># Analytics kênh + View Tracker</span>
+    │   ├── channels/page.tsx     <span class="c"># Quản lý kênh</span>
+    │   ├── channels/[id]/        <span class="c"># Chi tiết kênh</span>
+    │   ├── staff/page.tsx        <span class="c"># Quản lý nhân sự</span>
+    │   ├── videos/page.tsx       <span class="c"># Quản lý video</span>
+    │   ├── payroll/page.tsx      <span class="c"># Bảng lương</span>
+    │   └── settings/page.tsx     <span class="c"># Cấu hình metrics/permissions</span>
+    │
+    ├── manager/
+    │   ├── page.tsx              <span class="c"># KPI kênh được giao</span>
+    │   ├── analytics/page.tsx    <span class="c"># Analytics kênh + View Tracker</span>
+    │   ├── channels/             <span class="c"># Kênh được quản lý</span>
+    │   └── team/page.tsx         <span class="c"># Quản lý team</span>
+    │
+    └── staff/
+        ├── page.tsx              <span class="c"># KPI cá nhân</span>
+        ├── analytics/page.tsx    <span class="c"># View Tracker (local-only, không cần sync)</span>
+        ├── videos/page.tsx       <span class="c"># Khai báo video</span>
+        └── salary/page.tsx       <span class="c"># Xem lương</span></pre>
+
+  <!-- ─── Roles ───────────────────────────────────────── -->
+  <h2 id="roles">Role Permissions</h2>
+  <table>
+    <thead><tr><th>Tính năng</th><th>DIRECTOR</th><th>MANAGER</th><th>STAFF</th></tr></thead>
+    <tbody>
+      <tr><td>Xem analytics kênh</td><td>✅ Tất cả kênh</td><td>✅ Kênh được giao</td><td>❌</td></tr>
+      <tr><td>Sync YouTube data</td><td>✅</td><td>✅ Kênh được giao</td><td>❌</td></tr>
+      <tr><td>View Tracker (local)</td><td>✅</td><td>✅</td><td>✅</td></tr>
+      <tr><td>Xem revenue / CPM</td><td>✅ (mặc định)</td><td>🔧 Cấu hình được</td><td>🔧 Cấu hình được</td></tr>
+      <tr><td>Quản lý kênh</td><td>✅</td><td>✅ Giới hạn</td><td>❌</td></tr>
+      <tr><td>Khai báo video</td><td>✅</td><td>✅</td><td>✅</td></tr>
+      <tr><td>Duyệt assignment</td><td>✅</td><td>✅</td><td>❌</td></tr>
+      <tr><td>Tính & khoá lương</td><td>✅</td><td>❌</td><td>❌</td></tr>
+      <tr><td>Xem lương bản thân</td><td>✅</td><td>✅</td><td>✅</td></tr>
+      <tr><td>Quản lý users</td><td>✅</td><td>❌</td><td>❌</td></tr>
+      <tr><td>Settings / permissions</td><td>✅</td><td>❌</td><td>❌</td></tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top:48px;padding-top:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;">
+    WMG YouTube Tracker v2 — Developer Guide &nbsp;·&nbsp; Generated 2026-03-21
+  </div>
+</main>
+
+</body>
+</html>

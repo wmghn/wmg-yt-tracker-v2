@@ -18,6 +18,25 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-export const db = globalForPrisma.prisma ?? createPrismaClient();
+/**
+ * DB_PROVIDER=sqlite → dùng SQLite local (không cần Supabase)
+ * DB_PROVIDER=postgresql (hoặc không set) → dùng Supabase PostgreSQL
+ */
+function createDb(): PrismaClient {
+  if (process.env.DB_PROVIDER === "sqlite") {
+    // Dynamic require để tránh lỗi khi SQLite client chưa được generate
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { sqliteDb } = require("./sqlite-client") as { sqliteDb: PrismaClient };
+    return sqliteDb;
+  }
+  return createPrismaClient();
+}
+
+export const db = globalForPrisma.prisma ?? createDb();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
+
+/** Hiển thị thông tin DB đang dùng (cho settings UI) */
+export function getDbProvider(): "sqlite" | "postgresql" {
+  return process.env.DB_PROVIDER === "sqlite" ? "sqlite" : "postgresql";
+}

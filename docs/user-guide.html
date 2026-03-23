@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WMG YouTube Tracker — Hướng dẫn sử dụng</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3248;
+      --text: #e2e6f0;
+      --muted: #7a82a0;
+      --accent: #6366f1;
+      --accent2: #8b5cf6;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --cyan: #06b6d4;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    /* ── Layout ── */
+    .sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0;
+      width: 250px; background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto; padding: 24px 0;
+      z-index: 100;
+    }
+    .sidebar-logo {
+      padding: 0 20px 20px;
+      font-size: 15px; font-weight: 700;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+    .sidebar-logo span { color: var(--accent); }
+    .sidebar-logo small { display: block; font-size: 11px; font-weight: 400; color: var(--muted); margin-top: 2px; }
+    .sidebar-section {
+      padding: 10px 20px 4px;
+      font-size: 10px; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--muted); margin-top: 8px;
+    }
+    .sidebar-section.role-admin { color: #a78bfa; }
+    .sidebar-section.role-manager { color: var(--green); }
+    .sidebar a {
+      display: block; padding: 7px 20px;
+      color: var(--muted); text-decoration: none; font-size: 13px;
+      border-left: 2px solid transparent;
+      transition: all .15s;
+    }
+    .sidebar a:hover, .sidebar a.active { color: var(--text); background: var(--surface2); border-left-color: var(--accent); }
+    .main { margin-left: 250px; padding: 48px 56px; max-width: 1100px; }
+
+    /* ── Typography ── */
+    h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
+    h2 {
+      font-size: 20px; font-weight: 700; margin: 48px 0 16px;
+      padding-top: 48px; border-top: 1px solid var(--border);
+      scroll-margin-top: 24px;
+    }
+    h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+    h3 { font-size: 15px; font-weight: 700; margin: 28px 0 10px; color: var(--accent); scroll-margin-top: 24px; }
+    h4 { font-size: 13px; font-weight: 600; margin: 18px 0 8px; color: var(--text); }
+    p { color: var(--muted); margin-bottom: 10px; line-height: 1.7; }
+    ul, ol { color: var(--muted); padding-left: 20px; margin-bottom: 12px; }
+    li { margin-bottom: 5px; line-height: 1.7; }
+    li strong { color: var(--text); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      font-family: "JetBrains Mono", "Fira Code", monospace;
+      font-size: 12px; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 4px;
+      padding: 1px 6px; color: var(--cyan);
+    }
+
+    /* ── Components ── */
+    .hero {
+      background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
+      border: 1px solid var(--border); border-radius: 12px;
+      padding: 32px 36px; margin-bottom: 40px;
+    }
+    .hero-sub { color: var(--muted); font-size: 15px; margin-top: 6px; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    }
+    .badge-purple { background: #2d2458; color: var(--accent); border: 1px solid #3d3480; }
+    .badge-green  { background: #0d2e22; color: var(--green); border: 1px solid #164f39; }
+    .badge-amber  { background: #2e2008; color: var(--amber); border: 1px solid #4a3410; }
+    .badge-blue   { background: #0d1e35; color: var(--blue); border: 1px solid #1a3560; }
+
+    .role-section-admin { border-left: 3px solid #a78bfa; padding-left: 20px; }
+    .role-section-manager { border-left: 3px solid var(--green); padding-left: 20px; }
+
+    .step-list { list-style: none; padding: 0; counter-reset: step; }
+    .step-list > li {
+      counter-increment: step;
+      display: flex; gap: 14px;
+      margin-bottom: 18px; align-items: flex-start;
+    }
+    .step-list > li::before {
+      content: counter(step);
+      min-width: 26px; height: 26px;
+      background: var(--accent); border-radius: 50%;
+      font-size: 12px; font-weight: 700; color: white;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    .step-list > li .step-body { flex: 1; }
+    .step-list > li .step-title { font-weight: 600; color: var(--text); margin-bottom: 4px; font-size: 14px; }
+    .step-list > li p { margin-bottom: 0; font-size: 13px; }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 18px 20px; margin: 8px 0;
+    }
+    .card-title { font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 16px 0; }
+
+    .info-box {
+      background: #0d1e35; border: 1px solid #1a3560;
+      border-radius: 8px; padding: 14px 18px; margin: 14px 0;
+      font-size: 13px; color: var(--text);
+    }
+    .info-box.warning { background: #2a1800; border-color: #4a3010; }
+    .info-box.success { background: #0d2e22; border-color: #164f39; }
+    .info-box .label {
+      font-weight: 700; color: var(--blue); margin-right: 8px;
+      font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    }
+    .info-box.warning .label { color: var(--amber); }
+    .info-box.success .label { color: var(--green); }
+
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; }
+    th {
+      background: var(--surface2); text-align: left;
+      padding: 10px 14px; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em;
+      color: var(--muted); border-bottom: 1px solid var(--border);
+    }
+    td { padding: 9px 14px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,.02); }
+
+    .nav-divider {
+      height: 1px; background: var(--border); margin: 12px 0;
+    }
+
+    .screenshot-placeholder {
+      background: var(--surface2); border: 1px dashed var(--border);
+      border-radius: 8px; padding: 32px;
+      text-align: center; color: var(--muted); font-size: 12px;
+      margin: 12px 0;
+    }
+
+    .flow {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 20px 24px; margin: 16px 0;
+      font-size: 13px;
+    }
+    .flow-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+    .flow-arrow { color: var(--muted); font-size: 16px; margin-left: 10px; }
+    .flow-label {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; padding: 4px 10px; font-size: 12px;
+    }
+
+    .xlsx-example {
+      background: #1a2a1a; border: 1px solid #2a4a2a;
+      border-radius: 8px; overflow: hidden; margin: 12px 0;
+    }
+    .xlsx-header {
+      display: grid; grid-template-columns: 2fr 3fr 1fr;
+      background: #2a4a2a; padding: 8px 16px;
+      font-size: 11px; font-weight: 700; letter-spacing: .06em;
+      text-transform: uppercase; color: #6aab6a;
+      gap: 8px;
+    }
+    .xlsx-row {
+      display: grid; grid-template-columns: 2fr 3fr 1fr;
+      padding: 7px 16px; gap: 8px;
+      border-top: 1px solid #1e3a1e;
+      font-size: 12px; font-family: monospace;
+    }
+    .xlsx-row:hover { background: rgba(255,255,255,.03); }
+    .xlsx-cell { color: var(--text); }
+    .xlsx-cell.url { color: var(--cyan); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .xlsx-cell.role { color: var(--amber); }
+
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; padding: 24px 20px; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    ▶ YT Payroll
+    <small>Hướng dẫn sử dụng</small>
+  </div>
+
+  <div class="sidebar-section role-admin">Admin (Giám đốc)</div>
+  <a href="#admin-overview">Tổng quan</a>
+  <a href="#admin-create-channel">1. Tạo & Setup kênh</a>
+  <a href="#admin-connect-youtube">2. Kết nối YouTube</a>
+  <a href="#admin-sync">3. Cập nhật Views từ YT</a>
+  <a href="#admin-cron">4. Cài đặt Cron Job</a>
+  <a href="#admin-accounts">5. Tạo tài khoản Manager</a>
+
+  <div class="nav-divider"></div>
+
+  <div class="sidebar-section role-manager">Manager (Quản lý)</div>
+  <a href="#manager-overview">Tổng quan vai trò</a>
+  <a href="#manager-staff">Quản lý nhân sự</a>
+  <a href="#manager-analytics">Xem thống kê</a>
+  <a href="#manager-tracker">Views Tracker</a>
+  <a href="#manager-export">Xuất Excel</a>
+</nav>
+
+<!-- ── Main content ── -->
+<main class="main">
+
+  <!-- Hero -->
+  <div class="hero">
+    <h1>Hướng dẫn sử dụng</h1>
+    <p class="hero-sub">WMG YouTube Tracker v2 — Dành cho Admin (Giám đốc) và Manager (Quản lý)</p>
+    <div style="margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap;">
+      <span class="badge badge-purple">Admin / Giám đốc</span>
+      <span class="badge badge-green">Manager / Quản lý</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       PHẦN 1 — ADMIN
+  ══════════════════════════════════════════════ -->
+
+  <div class="role-section-admin">
+
+    <h2 id="admin-overview">Admin — Tổng quan</h2>
+    <p>Tài khoản <strong>Admin (Giám đốc)</strong> có toàn quyền trên hệ thống: quản lý tất cả kênh, tạo tài khoản, xem mọi chỉ số, cài đặt cron job, và phê duyệt dữ liệu lương.</p>
+
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-title">Quản lý Kênh</div>
+        <p>Tạo kênh, kết nối OAuth YouTube, cấu hình tỷ lệ phân chia vai trò.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">Nhân sự</div>
+        <p>Tạo tài khoản Manager, Staff. Gán Manager vào kênh. Đổi mật khẩu.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">Thống kê & Lương</div>
+        <p>Xem analytics toàn bộ kênh, tính lương, khoá kỳ thanh toán.</p>
+      </div>
+    </div>
+
+    <!-- ── 1. Tạo kênh ── -->
+    <h2 id="admin-create-channel">1. Tạo & Setup kênh</h2>
+    <p>Quy trình đầy đủ để một kênh YouTube đi vào hoạt động trong hệ thống gồm 3 bước chính:</p>
+
+    <div class="flow">
+      <div class="flow-row">
+        <span class="flow-label">Tạo kênh</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-label">Kết nối OAuth YouTube</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-label">Cấu hình tỷ lệ vai trò</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-label" style="border-color: #164f39; color: var(--green);">✓ Sẵn sàng</span>
+      </div>
+    </div>
+
+    <h3>Bước 1 — Tạo kênh mới</h3>
+    <ol class="step-list">
+      <li>
+        <div class="step-body">
+          <div class="step-title">Vào trang Quản lý Kênh</div>
+          <p>Menu trái → <strong>Quản lý Kênh</strong> → bấm nút <strong>"Thêm kênh"</strong>.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Điền thông tin kênh</div>
+          <p>Nhập <strong>YouTube Channel ID</strong> (dạng <code>UCxxxxxxxxxxxxxxxxxxxxxxx</code> — lấy từ URL trang kênh hoặc YouTube Studio → Settings → Channel → Basic info) và tên hiển thị.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Gán Manager cho kênh</div>
+          <p>Chọn Manager sẽ phụ trách kênh này. Có thể để trống và gán sau.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Kênh được tạo với trạng thái <code>PENDING_BKT</code></div>
+          <p>Kênh chưa hoạt động cho đến khi kết nối OAuth. Sau khi kết nối xong, chuyển sang <code>ACTIVE</code>.</p>
+        </div>
+      </li>
+    </ol>
+
+    <h3>Bước 2 — Cấu hình tỷ lệ vai trò (Weight)</h3>
+    <p>Tỷ lệ quy đổi xác định mỗi vai trò nhận được bao nhiêu % views của video.</p>
+
+    <div class="info-box">
+      <span class="label">Ví dụ</span>
+      Video có 100.000 views. Content (Writer) được 40% → nhận 40.000 views quy đổi. Editor được 60% → nhận 60.000 views quy đổi.
+    </div>
+
+    <ol class="step-list">
+      <li>
+        <div class="step-body">
+          <div class="step-title">Vào trang chi tiết kênh</div>
+          <p><strong>Quản lý Kênh</strong> → bấm vào tên kênh → tab <strong>"Tỷ lệ phân chia"</strong>.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Thiết lập tỷ lệ Writer / Editor</div>
+          <p>Nhập phần trăm cho từng vai trò. Tổng phải bằng 100%. Ví dụ: Content = 40%, Editor = 60%.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Chọn ngày hiệu lực</div>
+          <p>Tỷ lệ áp dụng từ ngày được chọn. Có thể tạo nhiều mốc lịch sử, hệ thống dùng mốc gần nhất.</p>
+        </div>
+      </li>
+    </ol>
+
+    <table>
+      <thead>
+        <tr><th>Vai trò</th><th>VideoRole</th><th>Mô tả</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Content / Writer</strong></td>
+          <td><code>WRITER</code></td>
+          <td>Người viết kịch bản, nội dung video</td>
+        </tr>
+        <tr>
+          <td><strong>Editor</strong></td>
+          <td><code>EDITOR</code></td>
+          <td>Người dựng / chỉnh sửa video</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ── 2. Kết nối YouTube ── -->
+    <h2 id="admin-connect-youtube">2. Kết nối kênh với YouTube</h2>
+    <p>Hệ thống dùng <strong>OAuth 2.0</strong> của Google để đọc dữ liệu analytics từ YouTube Analytics API. Mỗi kênh cần được kết nối một lần.</p>
+
+    <div class="info-box warning">
+      <span class="label">Yêu cầu</span>
+      Tài khoản Google dùng để xác thực phải là <strong>chủ sở hữu hoặc quản trị viên</strong> của kênh YouTube đó. Tài khoản không có quyền sẽ không thể lấy được analytics.
+    </div>
+
+    <ol class="step-list">
+      <li>
+        <div class="step-body">
+          <div class="step-title">Vào trang chi tiết kênh</div>
+          <p><strong>Quản lý Kênh</strong> → bấm tên kênh → tab <strong>"Kết nối YouTube"</strong>.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Bấm "Kết nối với Google"</div>
+          <p>Hệ thống chuyển hướng đến trang xác thực Google. Đăng nhập bằng tài khoản có quyền quản lý kênh YouTube đó.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Cấp quyền cho ứng dụng</div>
+          <p>Chọn <strong>"Cho phép"</strong> để cấp quyền đọc YouTube Analytics. Ứng dụng chỉ đọc dữ liệu, không thực hiện bất kỳ thao tác ghi nào lên kênh.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Xác nhận kết nối thành công</div>
+          <p>Trang chi tiết kênh hiển thị thông tin token: ngày hết hạn, kênh YouTube đã kết nối. Trạng thái kênh chuyển sang <code>ACTIVE</code>.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="info-box success">
+      <span class="label">Tự động refresh</span>
+      Token OAuth có thời hạn 1 giờ nhưng hệ thống <strong>tự động làm mới</strong> mỗi khi cần. Không cần thao tác thủ công trừ khi người dùng thu hồi quyền.
+    </div>
+
+    <!-- ── 3. Sync ── -->
+    <h2 id="admin-sync">3. Cập nhật Views từ YouTube</h2>
+    <p>Có 2 cách cập nhật dữ liệu views: <strong>thủ công</strong> (bấm nút) và <strong>tự động</strong> (cron job).</p>
+
+    <h3>3.1 — Cập nhật thủ công</h3>
+    <ol class="step-list">
+      <li>
+        <div class="step-body">
+          <div class="step-title">Vào trang Thống kê</div>
+          <p>Menu trái → <strong>Thống kê</strong>. Chọn kênh muốn cập nhật (hoặc để "Tất cả").</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Chọn khoảng thời gian</div>
+          <p>Dropdown ngày tháng góc phải: <strong>Tháng này</strong>, 28 ngày qua, 90 ngày, v.v. Khoảng thời gian này xác định dữ liệu views nào sẽ được lấy từ YouTube.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Bấm "Cập nhật từ YouTube"</div>
+          <p>Hệ thống tạo job ngầm và trả về ngay lập tức. Thanh trạng thái hiển thị tiến trình: <code>Đang khởi động → Đang sync → Đã cập nhật</code>.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Chờ hoàn thành</div>
+          <p>Thường mất 10–60 giây tùy số lượng video. Sau khi xong, trang tự động reload dữ liệu mới.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="info-box warning">
+      <span class="label">Lưu ý</span>
+      Sync lại cùng khoảng thời gian sẽ <strong>ghi đè</strong> dữ liệu cũ (lấy views mới nhất). Không tạo bản sao. Sync khoảng thời gian khác tạo snapshot riêng biệt.
+    </div>
+
+    <h3>3.2 — Luồng dữ liệu</h3>
+    <div class="flow">
+      <div class="flow-row">
+        <span class="flow-label">Bấm nút</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-label">API tạo job</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-label">Background function</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-label">YouTube Analytics API</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-label">Lưu vào DB</span>
+      </div>
+    </div>
+    <p>Chi tiết kỹ thuật xem tại: <a href="youtube-sync-flow.md">youtube-sync-flow.md</a></p>
+
+    <!-- ── 4. Cron Job ── -->
+    <h2 id="admin-cron">4. Cài đặt Cron Job</h2>
+    <p>Cron job tự động chạy sync analytics mỗi ngày theo lịch cấu hình, không cần bấm nút thủ công.</p>
+
+    <h3>Cấu hình toàn cục</h3>
+    <ol class="step-list">
+      <li>
+        <div class="step-body">
+          <div class="step-title">Vào Cài đặt</div>
+          <p>Menu trái → <strong>Cài đặt</strong> → mục <strong>"Tự động đồng bộ (Cron Job)"</strong>.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Bật / tắt cron</div>
+          <p>Toggle <strong>"Bật tự động đồng bộ"</strong>. Khi tắt, cron không chạy dù đến giờ.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Chọn tần suất</div>
+          <ul>
+            <li><strong>Hàng ngày</strong> — mỗi ngày 1 lần</li>
+            <li><strong>Mỗi 2 ngày</strong> — cách nhau ít nhất 44 giờ</li>
+            <li><strong>Hàng tuần</strong> — cách nhau ít nhất 7 ngày</li>
+          </ul>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Chọn giờ chạy (UTC)</div>
+          <p>Cron check mỗi giờ nhưng chỉ chạy khi đúng giờ cấu hình. Ví dụ: <code>2</code> UTC = 9:00 SA giờ Việt Nam (GMT+7).</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Chọn khoảng dữ liệu</div>
+          <p>Cron sẽ sync khoảng thời gian nào: <strong>Tháng này</strong>, 28 ngày qua, 90 ngày.</p>
+        </div>
+      </li>
+    </ol>
+
+    <h3>Bật / tắt từng kênh</h3>
+    <p>Trong cùng trang Cài đặt, phần <strong>"Kênh đang chạy Cron"</strong> liệt kê tất cả kênh active. Có thể tắt cron riêng cho từng kênh không muốn tự động sync.</p>
+    <p>Kênh đang được cron theo dõi hiển thị <span style="color:var(--green)">●</span> <strong>đang chạy</strong> với animation pulse.</p>
+
+    <h3>Xem lịch sử chạy</h3>
+    <p>Phần <strong>"Lịch sử chạy"</strong> hiển thị các lần cron đã thực thi: thời gian, trạng thái (thành công / lỗi / bỏ qua), số kênh/video đã sync, thời gian xử lý. Log tự xoá sau <strong>7 ngày</strong>.</p>
+
+    <!-- ── 5. Tài khoản ── -->
+    <h2 id="admin-accounts">5. Tạo tài khoản Manager & gán quyền</h2>
+
+    <h3>Tạo tài khoản mới</h3>
+    <ol class="step-list">
+      <li>
+        <div class="step-body">
+          <div class="step-title">Vào trang Nhân sự</div>
+          <p>Menu trái → <strong>Nhân sự</strong> → bấm <strong>"Thêm nhân viên"</strong>.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Điền thông tin</div>
+          <p>Nhập Họ tên, Email, Mật khẩu tạm, và chọn <strong>Vai trò</strong>: <code>MANAGER</code> hoặc <code>STAFF</code>.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Thông báo thông tin đăng nhập</div>
+          <p>Gửi email/mật khẩu tạm cho người dùng. Người dùng có thể đổi mật khẩu sau khi đăng nhập.</p>
+        </div>
+      </li>
+    </ol>
+
+    <h3>Gán Manager vào kênh</h3>
+    <ol class="step-list">
+      <li>
+        <div class="step-body">
+          <div class="step-title">Vào chi tiết kênh</div>
+          <p><strong>Quản lý Kênh</strong> → bấm tên kênh → tab <strong>"Thông tin"</strong>.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Chọn Manager phụ trách</div>
+          <p>Dropdown <strong>"Manager"</strong> → chọn tên. Lưu lại. Manager sẽ thấy kênh này trong danh sách của mình.</p>
+        </div>
+      </li>
+    </ol>
+
+    <h3>Đổi mật khẩu</h3>
+    <p>Admin có thể đổi mật khẩu cho bất kỳ tài khoản <strong>Manager hoặc Staff</strong> nào (không cần biết mật khẩu cũ). Vào <strong>Nhân sự</strong> → tìm tài khoản → bấm biểu tượng khoá.</p>
+
+    <h3>Phân quyền xem chỉ số</h3>
+    <p>Vào <strong>Cài đặt → Phân quyền xem chỉ số</strong> để cấu hình vai trò nào được xem Revenue, CPM, RPM, Impressions. Mặc định chỉ Director xem được tất cả.</p>
+
+  </div><!-- end role-section-admin -->
+
+  <!-- ══════════════════════════════════════════════
+       PHẦN 2 — MANAGER
+  ══════════════════════════════════════════════ -->
+
+  <div class="role-section-manager" style="margin-top: 64px;">
+
+    <h2 id="manager-overview">Manager — Tổng quan vai trò</h2>
+    <p>Tài khoản <strong>Manager (Quản lý)</strong> phụ trách một hoặc nhiều kênh YouTube. Manager quản lý đội nhóm (Staff), theo dõi views, và xem thống kê của kênh mình phụ trách.</p>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title" style="color: var(--green);">Manager có thể</div>
+        <ul>
+          <li>Xem thống kê kênh mình quản lý</li>
+          <li>Thêm / xoá Staff vào kênh</li>
+          <li>Sync dữ liệu YouTube (kênh của mình)</li>
+          <li>Dùng Views Tracker và xuất Excel</li>
+          <li>Đổi mật khẩu Staff trong kênh</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title" style="color: var(--red);">Manager không thể</div>
+        <ul>
+          <li>Tạo tài khoản mới</li>
+          <li>Xem kênh của Manager khác</li>
+          <li>Thay đổi cấu hình cron job</li>
+          <li>Xem tính lương / payroll</li>
+          <li>Thay đổi tỷ lệ phân chia vai trò</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ── Staff ── -->
+    <h2 id="manager-staff">Quản lý nhân sự (Staff)</h2>
+
+    <h3>Thêm Staff vào kênh</h3>
+    <ol class="step-list">
+      <li>
+        <div class="step-body">
+          <div class="step-title">Vào trang Nhân sự</div>
+          <p>Menu trái → <strong>Nhân sự</strong>. Danh sách hiển thị tất cả Staff trong các kênh bạn quản lý.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Bấm "Thêm nhân viên"</div>
+          <p>Chọn <strong>Staff đã có tài khoản</strong> từ danh sách, hoặc yêu cầu Admin tạo tài khoản mới trước.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Chọn kênh và xác nhận</div>
+          <p>Chọn kênh để thêm Staff vào. Staff sẽ có thể xem analytics của kênh đó.</p>
+        </div>
+      </li>
+    </ol>
+
+    <h3>Xoá Staff khỏi kênh</h3>
+    <p>Trong trang <strong>Nhân sự</strong> → tìm Staff → bấm nút xoá (biểu tượng thùng rác). Staff bị xoá khỏi kênh nhưng tài khoản vẫn còn.</p>
+
+    <!-- ── Analytics ── -->
+    <h2 id="manager-analytics">Xem thống kê</h2>
+    <p>Trang <strong>Analytics</strong> hiển thị dữ liệu views, doanh thu ước tính, và phân tích theo kênh / theo nhân sự.</p>
+
+    <h3>Chọn kênh và khoảng thời gian</h3>
+    <ol class="step-list">
+      <li>
+        <div class="step-body">
+          <div class="step-title">Chọn kênh</div>
+          <p>Dropdown góc trên trái: chọn kênh cụ thể hoặc "Tất cả kênh" (nếu quản lý nhiều kênh).</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Chọn khoảng thời gian</div>
+          <p>Dropdown góc phải:</p>
+          <ul>
+            <li><strong>Tháng này</strong> — từ 1 tháng đến nay</li>
+            <li><strong>28 ngày qua</strong> — mặc định</li>
+            <li><strong>90 ngày qua</strong>, <strong>365 ngày qua</strong>, <strong>Toàn bộ</strong></li>
+          </ul>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Đảm bảo dữ liệu đã được sync</div>
+          <p>Nếu dữ liệu chưa cập nhật, bấm <strong>"Cập nhật từ YouTube"</strong> để lấy views mới nhất. Thời gian cập nhật hiển thị ở góc trên phải.</p>
+        </div>
+      </li>
+    </ol>
+
+    <h3>Đọc các số liệu</h3>
+    <table>
+      <thead>
+        <tr><th>Chỉ số</th><th>Ý nghĩa</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Tổng Views</strong></td>
+          <td>Tổng lượt xem của tất cả video trong khoảng thời gian đã chọn</td>
+        </tr>
+        <tr>
+          <td><strong>Video</strong></td>
+          <td>Số video có dữ liệu trong khoảng thời gian đó</td>
+        </tr>
+        <tr>
+          <td><strong>Nhân sự</strong></td>
+          <td>Số Staff đang hoạt động trong kênh</td>
+        </tr>
+        <tr>
+          <td><strong>Views nhận được</strong></td>
+          <td>Views đã quy đổi theo tỷ lệ vai trò của từng nhân sự</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ── Views Tracker ── -->
+    <h2 id="manager-tracker">Views Tracker — Chuẩn bị & Sử dụng</h2>
+    <p>Views Tracker là công cụ chính để tính <strong>views quy đổi cho từng nhân sự</strong>. Mỗi người được gán danh sách video họ đã làm, hệ thống tự tính views nhận được theo tỷ lệ vai trò.</p>
+
+    <h3>Cấu trúc Views Tracker</h3>
+    <p>Trong trang Analytics → tab <strong>"Quản lý"</strong> của View Tracker:</p>
+    <ul>
+      <li>Mỗi <strong>nhân sự</strong> có một thẻ (card) riêng</li>
+      <li>Mỗi nhân sự có <strong>danh sách video ID</strong> họ đã thực hiện</li>
+      <li>Mỗi nhân sự có một <strong>vai trò</strong>: Content (WRITER) hoặc Editor (EDITOR)</li>
+    </ul>
+
+    <h3>Thêm nhân sự vào Tracker</h3>
+    <ol class="step-list">
+      <li>
+        <div class="step-body">
+          <div class="step-title">Bấm "Thêm người"</div>
+          <p>Nút <strong>+ Thêm người</strong> trong tab Quản lý. Nhập tên và chọn vai trò (Content / Editor).</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Thêm video cho nhân sự</div>
+          <p>Bấm nút <strong>Sửa video</strong> trên thẻ nhân sự. Nhập danh sách video ID hoặc URL YouTube (mỗi dòng một video).</p>
+          <p>Hệ thống chấp nhận nhiều định dạng:</p>
+          <ul>
+            <li>Video ID trực tiếp: <code>dQw4w9WgXcQ</code></li>
+            <li>URL đầy đủ: <code>https://www.youtube.com/watch?v=dQw4w9WgXcQ</code></li>
+            <li>URL rút gọn: <code>https://youtu.be/dQw4w9WgXcQ</code></li>
+            <li>YouTube Shorts: <code>https://www.youtube.com/shorts/dQw4w9WgXcQ</code></li>
+          </ul>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">Dữ liệu được lưu tự động</div>
+          <p>Cấu hình nhân sự và video được lưu vào database, không bị mất khi refresh trang.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="info-box warning">
+      <span class="label">Quan trọng</span>
+      Một video có thể được gán cho <strong>nhiều người</strong> (ví dụ: 1 Content + 1 Editor). Hệ thống tự tính phân chia theo tỷ lệ vai trò. Nếu 3 Editor cùng làm 1 video, mỗi người nhận <code>60% ÷ 3 = 20%</code>.
+    </div>
+
+    <h3>Xem kết quả Phân tích</h3>
+    <p>Chuyển sang tab <strong>"Phân tích"</strong>. Hệ thống hiển thị:</p>
+    <ul>
+      <li>Tổng <strong>views nhận được</strong> của từng nhân sự trong khoảng thời gian đã chọn</li>
+      <li>Bảng chi tiết từng video: tổng views, số người cùng vai trò, views quy đổi</li>
+      <li>Có thể mở rộng từng nhân sự để xem breakdown theo video</li>
+    </ul>
+
+    <h3>Công thức tính views nhận được</h3>
+    <div class="info-box">
+      <span class="label">Công thức</span>
+      <strong>Views nhận được = Tổng views video × Tỷ lệ vai trò ÷ Số người cùng vai trò</strong>
+      <br><br>
+      Ví dụ: Video đạt 120.000 views. Content weight = 40%. Có 2 Writer cùng làm video này.
+      <br>→ Mỗi Writer nhận: <code>120.000 × 40% ÷ 2 = 24.000 views</code>
+    </div>
+
+    <!-- ── Export ── -->
+    <h2 id="manager-export">Xuất báo cáo Excel</h2>
+    <p>Bấm nút <strong>"Tạo file Excel mẫu"</strong> trong View Tracker để tải file <code>.xlsx</code> chứa dữ liệu phân tích.</p>
+
+    <h3>Cấu trúc file Excel</h3>
+    <p>File Excel gồm các cột:</p>
+
+    <div class="xlsx-example">
+      <div class="xlsx-header">
+        <span>Tên nhân sự</span>
+        <span>Video</span>
+        <span>Views nhận được</span>
+      </div>
+      <div class="xlsx-row">
+        <span class="xlsx-cell">Thảo (Content)</span>
+        <span class="xlsx-cell url">Tiêu đề video 1</span>
+        <span class="xlsx-cell">81.400</span>
+      </div>
+      <div class="xlsx-row">
+        <span class="xlsx-cell"></span>
+        <span class="xlsx-cell url">Tiêu đề video 2</span>
+        <span class="xlsx-cell">24.000</span>
+      </div>
+      <div class="xlsx-row">
+        <span class="xlsx-cell">Xuân (Editor)</span>
+        <span class="xlsx-cell url">Tiêu đề video 1</span>
+        <span class="xlsx-cell">115.600</span>
+      </div>
+    </div>
+
+    <div class="info-box">
+      <span class="label">Lưu ý</span>
+      File Excel hiển thị số views <strong>chính xác</strong> (không rút gọn K/M) vì đây là dữ liệu dùng để tính lương thưởng.
+    </div>
+
+    <h3>Khoảng thời gian trong Export</h3>
+    <p>File Excel phản ánh khoảng thời gian đang chọn trên trang Analytics. Để xuất dữ liệu <strong>Tháng này</strong>, chọn "Tháng này" từ dropdown trước khi bấm xuất.</p>
+
+  </div><!-- end role-section-manager -->
+
+</main>
+
+<script>
+  // Highlight active sidebar link on scroll
+  const headings = document.querySelectorAll('h2[id], h3[id]');
+  const links = document.querySelectorAll('.sidebar a');
+
+  function updateActive() {
+    let current = '';
+    headings.forEach(h => {
+      if (window.scrollY >= h.offsetTop - 80) current = h.id;
+    });
+    links.forEach(l => {
+      l.classList.toggle('active', l.getAttribute('href') === '#' + current);
+    });
+  }
+  window.addEventListener('scroll', updateActive);
+  updateActive();
+</script>
+
+</body>
+</html>

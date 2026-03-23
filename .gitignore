@@ -43,3 +43,8 @@ Thumbs.db
 
 # Local Netlify folder
 .netlify
+# Local SQLite database
+local.db
+local.db-journal
+local.db-wal
+lib/generated/
