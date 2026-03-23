@@ -20,7 +20,7 @@ const nextConfig = {
   // Không bundle các package Node.js native để tránh lỗi ESM/CJS
   // Next.js 14 dùng experimental.serverComponentsExternalPackages (Next.js 15+ đổi thành serverExternalPackages)
   experimental: {
-    serverComponentsExternalPackages: ["otpauth", "qrcode", "better-sqlite3", "@prisma/adapter-better-sqlite3", "jose"],
+    serverComponentsExternalPackages: ["otpauth", "qrcode"],
   },
 };
 
