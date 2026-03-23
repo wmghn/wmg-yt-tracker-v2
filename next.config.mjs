@@ -19,7 +19,10 @@ const nextConfig = {
   // Ẩn header X-Powered-By: Next.js
   poweredByHeader: false,
   // Không bundle các package Node.js native để tránh lỗi ESM/CJS
-  serverExternalPackages: ["otpauth", "qrcode", "better-sqlite3", "@prisma/adapter-better-sqlite3"],
+  // Next.js 14 dùng experimental.serverComponentsExternalPackages (Next.js 15+ đổi thành serverExternalPackages)
+  experimental: {
+    serverComponentsExternalPackages: ["otpauth", "qrcode", "better-sqlite3", "@prisma/adapter-better-sqlite3"],
+  },
 };
 
 export default nextConfig;
