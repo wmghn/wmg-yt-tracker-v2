@@ -31,3 +31,18 @@ export function decrypt(ciphertext: string): string {
   decipher.setAuthTag(authTag);
   return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
 }
+
+/**
+ * Decrypt if the value looks like an encrypted token; otherwise return as-is.
+ * Handles legacy plain-text tokens stored before encryption was added.
+ */
+export function safeDecrypt(value: string): string {
+  if (value.split(":").length === 3) {
+    try {
+      return decrypt(value);
+    } catch {
+      // fall through — treat as plain text
+    }
+  }
+  return value;
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Youtube, CheckCircle2, XCircle, ExternalLink, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,9 @@ export function YoutubeOAuthCard({
 }: Props) {
   const router = useRouter();
   const [disconnecting, setDisconnecting] = useState(false);
+  const [origin, setOrigin] = useState("");
+
+  useEffect(() => { setOrigin(window.location.origin); }, []);
 
   async function handleDisconnect() {
     if (!confirm("Ngắt kết nối YouTube? Tính năng sync Analytics sẽ không hoạt động.")) return;
@@ -189,7 +192,7 @@ export function YoutubeOAuthCard({
             <span>
               Redirect URI cần đăng ký trong Google Console:{" "}
               <code className="rounded bg-white px-1 py-0.5 border">
-                {typeof window !== "undefined" ? window.location.origin : ""}/api/oauth/youtube/callback
+                {origin}/api/oauth/youtube/callback
               </code>
             </span>
           </div>

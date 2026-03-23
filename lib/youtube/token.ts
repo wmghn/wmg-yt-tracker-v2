@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { encrypt, decrypt } from "@/lib/crypto";
+import { encrypt, safeDecrypt } from "@/lib/crypto";
 
 /**
  * Returns a valid access token for the given channel.
@@ -24,8 +24,8 @@ export async function getValidAccessToken(channelId: string): Promise<string | n
   const token = channel?.oauthToken;
   if (!token) return null;
 
-  const accessToken = decrypt(token.accessToken);
-  const refreshToken = decrypt(token.refreshToken);
+  const accessToken = safeDecrypt(token.accessToken);
+  const refreshToken = safeDecrypt(token.refreshToken);
 
   // Still valid with 60-second buffer
   const bufferMs = 60 * 1000;

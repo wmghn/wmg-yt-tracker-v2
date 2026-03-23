@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createOAuthState } from "@/lib/youtube/oauth-state";
 import { revokeGoogleToken } from "@/lib/youtube/token";
+import { safeDecrypt } from "@/lib/crypto";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/yt-analytics.readonly",
@@ -91,7 +92,7 @@ export async function DELETE(
 
     // Revoke at Google (best-effort — do not fail if this errors)
     if (tokenRecord?.refreshToken) {
-      await revokeGoogleToken(tokenRecord.refreshToken);
+      await revokeGoogleToken(safeDecrypt(tokenRecord.refreshToken));
     }
 
     // Unlink then delete locally
