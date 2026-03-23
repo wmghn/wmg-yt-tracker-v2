@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ChangePasswordDialog } from "@/components/users/change-password-dialog";
 
 interface StaffUser {
   id: string;
@@ -133,6 +134,15 @@ export default function DirectorStaffPage() {
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [currentUserName, setCurrentUserName] = useState<string>("");
+
+  useEffect(() => {
+    fetch("/api/users/me").then((r) => r.json()).then((d) => {
+      setCurrentUserId(d.id ?? "");
+      setCurrentUserName(d.name ?? "");
+    }).catch(() => {});
+  }, []);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -180,7 +190,12 @@ export default function DirectorStaffPage() {
           <Users className="h-6 w-6 text-zinc-500" />
           <h1 className="text-2xl font-bold text-zinc-900">Nhân sự</h1>
         </div>
-        <AddStaffDialog onCreated={fetchUsers} />
+        <div className="flex items-center gap-2">
+          {currentUserId && (
+            <ChangePasswordDialog userId={currentUserId} userName={currentUserName} isSelf={true} />
+          )}
+          <AddStaffDialog onCreated={fetchUsers} />
+        </div>
       </div>
 
       {/* Loading */}
@@ -214,6 +229,7 @@ export default function DirectorStaffPage() {
             onRoleChange={handleRoleChange}
             onToggleActive={handleToggleActive}
           />
+
         </div>
       )}
     </div>
@@ -233,6 +249,7 @@ function Section({
   onRoleChange: (id: string, role: string) => void;
   onToggleActive: (id: string, current: boolean) => void;
 }) {
+
   return (
     <div className="rounded-xl border bg-white shadow-sm">
       <div className="flex items-center gap-2 border-b px-5 py-4">
@@ -253,6 +270,7 @@ function Section({
                 <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">Quyền</th>
                 <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">Trạng thái</th>
                 <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">Ngày tạo</th>
+                <th className="px-5 py-2.5 text-left text-xs font-medium text-zinc-500">Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -294,6 +312,9 @@ function Section({
                   </td>
                   <td className="px-5 py-3 text-zinc-400 text-xs">
                     {new Date(u.createdAt).toLocaleDateString("vi-VN")}
+                  </td>
+                  <td className="px-5 py-3">
+                    <ChangePasswordDialog userId={u.id} userName={u.name} isSelf={false} />
                   </td>
                 </tr>
               ))}

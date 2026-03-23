@@ -65,25 +65,38 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "INTERNAL_SYNC_SECRET chưa được cấu hình" }, { status: 500 });
       }
 
-      const baseUrl = process.env.NETLIFY_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:8888";
+      // process.env.URL là biến chuẩn của Netlify (site URL chính)
+      const baseUrl = process.env.URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:8888";
+      const bgUrl = `${baseUrl}/.netlify/functions/sync-background`;
 
-      fetch(`${baseUrl}/.netlify/functions/sync-background`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId: job.id, channelIds, dateRange: rangeType, month, year, secret: internalSecret }),
-      }).then(async (res) => {
-        if (!res.ok) {
-          await db.syncJob.update({
-            where: { id: job.id },
-            data: { status: "error", result: { errors: [`Background function trả về ${res.status}`], channelsSynced: 0, videosSynced: 0, snapshotsUpserted: 0 } },
-          }).catch(() => {});
-        }
-      }).catch(() => {
-        db.syncJob.update({
+      console.log(`[sync] Triggering background function: ${bgUrl}`);
+
+      // PHẢI await để đảm bảo Netlify nhận được request trước khi function context bị kill.
+      // Background function trả 202 ngay lập tức → không bị block lâu.
+      let triggerRes: Response;
+      try {
+        triggerRes = await fetch(bgUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobId: job.id, channelIds, dateRange: rangeType, month, year, secret: internalSecret }),
+        });
+      } catch (err) {
+        console.error("[sync] Không thể kết nối background function:", err);
+        await db.syncJob.update({
           where: { id: job.id },
           data: { status: "error", result: { errors: ["Không thể khởi động background function"], channelsSynced: 0, videosSynced: 0, snapshotsUpserted: 0 } },
         }).catch(() => {});
-      });
+        return NextResponse.json({ error: "Không thể khởi động sync" }, { status: 500 });
+      }
+
+      if (!triggerRes.ok) {
+        console.error(`[sync] Background function trả về ${triggerRes.status}`);
+        await db.syncJob.update({
+          where: { id: job.id },
+          data: { status: "error", result: { errors: [`Background function trả về ${triggerRes.status}`], channelsSynced: 0, videosSynced: 0, snapshotsUpserted: 0 } },
+        }).catch(() => {});
+        return NextResponse.json({ error: `Sync lỗi (${triggerRes.status})` }, { status: 500 });
+      }
     } else {
       // Local dev: chạy sync trực tiếp trong background (không await response)
       void (async () => {

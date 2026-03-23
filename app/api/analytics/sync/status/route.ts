@@ -20,13 +20,32 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Missing jobId" }, { status: 400 });
     }
 
-    const job = await db.syncJob.findUnique({
+    let job = await db.syncJob.findUnique({
       where: { id: jobId },
       select: { id: true, status: true, result: true, createdAt: true, updatedAt: true },
     });
 
     if (!job) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
+    }
+
+    // Nếu job bị stuck quá 10 phút → tự mark error
+    const TIMEOUT_MS = 10 * 60 * 1000;
+    if ((job.status === "running" || job.status === "pending")) {
+      const elapsedMs = Date.now() - new Date(job.createdAt).getTime();
+      if (elapsedMs > TIMEOUT_MS) {
+        const timeoutResult = {
+          errors: ["Sync timeout — chạy quá 10 phút, có thể do lỗi kết nối YouTube hoặc Netlify"],
+          channelsSynced: 0,
+          videosSynced: 0,
+          snapshotsUpserted: 0,
+        };
+        await db.syncJob.update({
+          where: { id: jobId },
+          data: { status: "error", result: timeoutResult },
+        }).catch(() => {});
+        job = { ...job, status: "error", result: timeoutResult };
+      }
     }
 
     return NextResponse.json(job);

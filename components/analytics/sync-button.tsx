@@ -21,6 +21,7 @@ interface Props {
 type SyncState = "idle" | "pending" | "running" | "done" | "error";
 
 const POLL_INTERVAL_MS = 3000;
+const MAX_POLL_MS = 10 * 60 * 1000; // 10 phút
 
 export function SyncButton({ channelId, dateRange, month, year, onDone }: Props) {
   const [state, setState] = useState<SyncState>("idle");
@@ -45,7 +46,17 @@ export function SyncButton({ channelId, dateRange, month, year, onDone }: Props)
   }
 
   function startPolling(jobId: string) {
+    const pollStart = Date.now();
+
     pollRef.current = setInterval(async () => {
+      // Timeout phía client: dừng poll sau 10 phút
+      if (Date.now() - pollStart > MAX_POLL_MS) {
+        clearTimers();
+        setErrorMsg("Sync chạy quá 10 phút — kiểm tra lại kết nối hoặc thử lại");
+        setState("error");
+        return;
+      }
+
       try {
         const res = await fetch(`/api/analytics/sync/status?jobId=${jobId}`);
         if (!res.ok) return;
