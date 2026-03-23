@@ -24,9 +24,9 @@ const globalForPrisma = globalThis as unknown as {
  */
 function createDb(): PrismaClient {
   if (process.env.DB_PROVIDER === "sqlite") {
-    // Dynamic require để tránh lỗi khi SQLite client chưa được generate
+    // webpackIgnore: true → webpack bỏ qua module này khi build (không cần generate SQLite client trên Netlify/Vercel)
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { sqliteDb } = require("./sqlite-client") as { sqliteDb: PrismaClient };
+    const { sqliteDb } = require(/* webpackIgnore: true */ "./sqlite-client") as { sqliteDb: PrismaClient };
     return sqliteDb;
   }
   return createPrismaClient();
