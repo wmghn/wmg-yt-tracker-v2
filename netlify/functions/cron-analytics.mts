@@ -74,9 +74,14 @@ export default async function handler() {
 
   // ── Check frequency (min hours between runs) ────────────────────────────────
   const minHoursMap: Record<string, number> = {
-    daily: 20,
+    // Test options
+    every5min:  0.08,
+    every30min: 0.45,
+    hourly:     0.9,
+    // Production options
+    daily:      20,
     every2days: 44,
-    weekly: 164,
+    weekly:     164,
   };
   const minHours = minHoursMap[config.frequency] ?? 20;
 

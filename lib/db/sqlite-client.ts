@@ -13,6 +13,7 @@
  */
 
 import { PrismaClient } from "../generated/prisma-sqlite";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 
 // Mapping: model → fields cần serialize/deserialize
 const ARRAY_FIELDS: Record<string, string[]> = {
@@ -54,7 +55,11 @@ function deserializeFields(model: string, data: Record<string, unknown>) {
 }
 
 function createSqliteClient() {
+  const url = (process.env.DATABASE_URL ?? "file:./local.db").replace(/^file:/, "");
+  const adapter = new PrismaBetterSqlite3({ url });
+
   const client = new PrismaClient({
+    adapter,
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 

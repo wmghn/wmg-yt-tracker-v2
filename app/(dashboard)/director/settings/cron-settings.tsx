@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Clock, RefreshCw, Power, Calendar, Repeat, ToggleLeft, ToggleRight, CheckCircle, AlertCircle, ChevronDown, ChevronUp, XCircle, SkipForward } from "lucide-react";
+import { Clock, RefreshCw, Power, Calendar, Repeat, ToggleLeft, ToggleRight, CheckCircle, AlertCircle, ChevronDown, ChevronUp, XCircle, SkipForward, Play, FlaskConical } from "lucide-react";
 
 interface CronConfig {
   enabled: boolean;
@@ -36,9 +36,12 @@ interface CronLog {
 }
 
 const FREQUENCY_OPTS = [
-  { value: "daily",      label: "Hàng ngày" },
-  { value: "every2days", label: "Mỗi 2 ngày" },
-  { value: "weekly",     label: "Hàng tuần" },
+  { value: "every5min",  label: "Mỗi 5 phút (test)",  isTest: true },
+  { value: "every30min", label: "Mỗi 30 phút (test)", isTest: true },
+  { value: "hourly",     label: "Mỗi giờ (test)",     isTest: true },
+  { value: "daily",      label: "Hàng ngày",           isTest: false },
+  { value: "every2days", label: "Mỗi 2 ngày",          isTest: false },
+  { value: "weekly",     label: "Hàng tuần",           isTest: false },
 ];
 
 const HOUR_OPTS = Array.from({ length: 24 }, (_, i) => ({
@@ -78,6 +81,8 @@ export function CronSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [runResult, setRunResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -109,6 +114,27 @@ export function CronSettings() {
     setTimeout(() => setSavedOk(false), 2000);
   }
 
+  async function runNow() {
+    setRunning(true);
+    setRunResult(null);
+    try {
+      const res = await fetch("/api/admin/cron/run-now", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setRunResult({
+          ok: true,
+          msg: `✓ ${data.channelsSynced} kênh · ${data.videosSynced} video · ${data.snapshotsUpserted} snapshots (${((data.durationMs ?? 0) / 1000).toFixed(1)}s)`,
+        });
+      } else {
+        setRunResult({ ok: false, msg: data.error ?? "Lỗi không xác định" });
+      }
+    } catch {
+      setRunResult({ ok: false, msg: "Không thể kết nối server" });
+    }
+    setRunning(false);
+    load(); // refresh logs + lastRunAt
+  }
+
   async function toggleChannel(channelId: string, enabled: boolean) {
     setChannels((prev) =>
       prev.map((c) => (c.id === channelId ? { ...c, enabled } : c))
@@ -132,6 +158,7 @@ export function CronSettings() {
   if (!config) return null;
 
   const enabledChannels = channels.filter((c) => c.enabled).length;
+  const isTestFrequency = FREQUENCY_OPTS.find((o) => o.value === config.frequency)?.isTest ?? false;
   const sortedChannels = [...channels].sort((a, b) => {
     if (a.enabled === b.enabled) return a.name.localeCompare(b.name);
     return a.enabled ? -1 : 1;
@@ -167,9 +194,16 @@ export function CronSettings() {
             onChange={(e) => saveGlobal({ frequency: e.target.value })}
             className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
           >
-            {FREQUENCY_OPTS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
+            <optgroup label="🧪 Test">
+              {FREQUENCY_OPTS.filter((o) => o.isTest).map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Production">
+              {FREQUENCY_OPTS.filter((o) => !o.isTest).map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </optgroup>
           </select>
         </div>
 
@@ -207,6 +241,34 @@ export function CronSettings() {
             ))}
           </select>
         </div>
+      </div>
+
+      {/* Test mode warning */}
+      {isTestFrequency && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          <FlaskConical className="h-3.5 w-3.5 shrink-0" />
+          Đang ở chế độ test — nhớ đổi lại tần suất trước khi deploy production.
+        </div>
+      )}
+
+      {/* Run Now button */}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={runNow}
+          disabled={running}
+          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {running
+            ? <RefreshCw className="h-4 w-4 animate-spin" />
+            : <Play className="h-4 w-4" />}
+          {running ? "Đang chạy..." : "Chạy ngay"}
+        </button>
+        {runResult && (
+          <span className={`text-xs font-medium ${runResult.ok ? "text-emerald-600" : "text-red-600"}`}>
+            {runResult.msg}
+          </span>
+        )}
       </div>
 
       {/* Last run status */}
