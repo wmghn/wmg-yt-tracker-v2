@@ -36,7 +36,7 @@ export async function GET(req: Request) {
 
     const useSnapshot = rangeType !== "lifetime";
 
-    type Row = { youtubeVideoId: string; title: string; viewsCount: bigint };
+    type Row = { youtubeVideoId: string; title: string; thumbnailUrl: string | null; viewsCount: bigint };
     let rows: Row[];
 
     if (useSnapshot) {
@@ -45,6 +45,7 @@ export async function GET(req: Request) {
             SELECT
               v."youtubeVideoId",
               v.title,
+              v."thumbnailUrl",
               COALESCE(s.views, 0)::bigint AS "viewsCount"
             FROM videos v
             LEFT JOIN analytics_snapshots s
@@ -57,6 +58,7 @@ export async function GET(req: Request) {
             SELECT
               v."youtubeVideoId",
               v.title,
+              v."thumbnailUrl",
               COALESCE(s.views, 0)::bigint AS "viewsCount"
             FROM videos v
             LEFT JOIN analytics_snapshots s
@@ -70,6 +72,7 @@ export async function GET(req: Request) {
             SELECT
               v."youtubeVideoId",
               v.title,
+              v."thumbnailUrl",
               COALESCE(
                 (SELECT vvl."viewsCount"
                  FROM video_views_log vvl
@@ -85,6 +88,7 @@ export async function GET(req: Request) {
             SELECT
               v."youtubeVideoId",
               v.title,
+              v."thumbnailUrl",
               COALESCE(
                 (SELECT vvl."viewsCount"
                  FROM video_views_log vvl
@@ -102,6 +106,7 @@ export async function GET(req: Request) {
       videos: rows.map((r) => ({
         youtubeVideoId: r.youtubeVideoId,
         title: r.title,
+        thumbnailUrl: r.thumbnailUrl ?? null,
         viewsCount: Number(r.viewsCount),
       })),
     });

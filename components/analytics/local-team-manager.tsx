@@ -21,6 +21,7 @@ interface LocalPerson {
 interface VideoViewData {
   youtubeVideoId: string;
   title: string;
+  thumbnailUrl: string | null;
   viewsCount: number;
 }
 
@@ -32,6 +33,7 @@ interface WeightConfig {
 interface PersonVideoRow {
   youtubeVideoId: string;
   title: string;
+  thumbnailUrl: string | null;
   totalViews: number;
   sameRoleCount: number;
   roleWeight: number;
@@ -274,6 +276,7 @@ function computeSummaries(
         return {
           youtubeVideoId: ytId,
           title: data?.title ?? ytId,
+          thumbnailUrl: data?.thumbnailUrl ?? null,
           totalViews,
           sameRoleCount,
           roleWeight,
@@ -579,19 +582,33 @@ function AnalyticsSection({ summaries }: { summaries: PersonSummaryRow[] }) {
                     {row.videos.map((v) => (
                       <tr key={v.youtubeVideoId} className="border-b border-zinc-50 last:border-0 hover:bg-zinc-50/40">
                         <td className="px-5 py-3">
-                          <p className="font-medium text-zinc-900 line-clamp-2 max-w-[260px] text-sm">
-                            {v.title !== v.youtubeVideoId
-                              ? v.title
-                              : <span className="text-zinc-400 italic">Chưa có tiêu đề</span>}
-                          </p>
-                          <a
-                            href={`https://www.youtube.com/watch?v=${v.youtubeVideoId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-mono text-xs text-blue-600 hover:underline"
-                          >
-                            {v.youtubeVideoId}
-                          </a>
+                          <div className="flex items-center gap-3">
+                            {v.thumbnailUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={v.thumbnailUrl}
+                                alt=""
+                                className="h-10 w-16 shrink-0 rounded object-cover bg-zinc-100"
+                              />
+                            ) : (
+                              <div className="h-10 w-16 shrink-0 rounded bg-zinc-100" />
+                            )}
+                            <div>
+                              <p className="font-medium text-zinc-900 line-clamp-2 max-w-[240px] text-sm">
+                                {v.title !== v.youtubeVideoId
+                                  ? v.title
+                                  : <span className="text-zinc-400 italic">Chưa có tiêu đề</span>}
+                              </p>
+                              <a
+                                href={`https://www.youtube.com/watch?v=${v.youtubeVideoId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-mono text-xs text-blue-600 hover:underline"
+                              >
+                                {v.youtubeVideoId}
+                              </a>
+                            </div>
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-zinc-800 whitespace-nowrap">
                           {v.totalViews.toLocaleString("vi-VN")}
@@ -651,7 +668,14 @@ function exportPersonsXlsx(persons: LocalPerson[], channelId: string) {
 
 // ─── Main export ───────────────────────────────────────────────────────────────
 
-const DEFAULT_DATE_RANGE: DateRangeValue = { type: "28days", label: "28 ngày qua" };
+function currentMonthRange(): DateRangeValue {
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
+  return { type: "month", month, year, label: `Tháng ${month}/${year}` };
+}
+
+const DEFAULT_DATE_RANGE: DateRangeValue = currentMonthRange();
 
 interface Props {
   channelId: string;

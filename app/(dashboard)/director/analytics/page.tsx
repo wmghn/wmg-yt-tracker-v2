@@ -11,7 +11,9 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
+  Download,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import {
   BarChart,
   Bar,
@@ -71,6 +73,23 @@ function fmt(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return n.toLocaleString("vi-VN");
+}
+
+function exportViewsXlsx(videos: TopVideo[], label: string) {
+  const header = ["STT", "Tiêu đề video", "Video ID", "Số views", "Link video"];
+  const rows = videos.map((v, i) => [
+    i + 1,
+    v.title || "",
+    v._youtubeVideoId ?? v.youtubeVideoId,
+    v.metrics.views,
+    `https://www.youtube.com/watch?v=${v._youtubeVideoId ?? v.youtubeVideoId}`,
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws["!cols"] = [{ wch: 5 }, { wch: 60 }, { wch: 14 }, { wch: 12 }, { wch: 46 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Views");
+  const ts = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `views-${label}-${ts}.xlsx`);
 }
 
 function parseDateRange(params: URLSearchParams): DateRangeValue {
@@ -313,6 +332,19 @@ function DirectorAnalyticsContent() {
               <div className="flex items-center gap-3">
                 {!collapsed["videos"] && data.mode === "channel" && (
                   <span className="text-xs text-zinc-400">Sắp xếp theo views giảm dần</span>
+                )}
+                {!collapsed["videos"] && data.topVideos.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      exportViewsXlsx(data.topVideos, data.dateRange.label.replace(/\s/g, "-"));
+                    }}
+                    className="flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Export Excel
+                  </button>
                 )}
                 {collapsed["videos"] ? (
                   <ChevronDown className="h-4 w-4 text-zinc-400 shrink-0" />
