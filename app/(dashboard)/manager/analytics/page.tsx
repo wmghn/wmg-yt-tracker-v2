@@ -423,7 +423,11 @@ function ManagerAnalyticsContent() {
             ))}
           </div>
           <div className="border-t px-5 py-4">
-            <LocalTeamManager channelId={selectedChannel} />
+            <LocalTeamManager
+                channelId={selectedChannel}
+                dateRange={dateRange}
+                onDateRangeChange={handleDateRangeChange}
+              />
           </div>
         </div>
       )}
