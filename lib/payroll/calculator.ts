@@ -23,8 +23,32 @@ export type PayrollPreview = {
   detail: PayrollDetailItem[];
 };
 
+// ─── Internal types for batch-fetched data ────────────────────────────────────
+
+type Assignment = {
+  id: string;
+  videoId: string;
+  role: string;
+  video: {
+    id: string;
+    title: string;
+    youtubeVideoId: string;
+    channelId: string;
+  };
+};
+
+type ComputedDetail = {
+  detail: PayrollDetailItem[];
+  totalViews: bigint;
+  totalBonus: Decimal;
+};
+
+// ─── PayrollCalculator ────────────────────────────────────────────────────────
+
 export class PayrollCalculator {
+  // ────────────────────────────────────────────────────────────────────────────
   // Lấy SalaryConfig hiệu lực mới nhất của user (effectiveFrom <= now)
+  // ────────────────────────────────────────────────────────────────────────────
   private async getActiveSalaryConfig(userId: string) {
     return db.salaryConfig.findFirst({
       where: {
@@ -35,51 +59,206 @@ export class PayrollCalculator {
     });
   }
 
-  // Lấy ChannelWeightConfig hiệu lực mới nhất cho channel+role
-  private async getActiveWeightConfig(channelId: string, role: string) {
-    return db.channelWeightConfig.findFirst({
-      where: {
-        channelId,
-        role: role as "WRITER" | "EDITOR",
-        effectiveFrom: { lte: new Date() },
-      },
-      orderBy: { effectiveFrom: "desc" },
-    });
+  // ────────────────────────────────────────────────────────────────────────────
+  // Batch fetch views cho một khoảng thời gian từ AnalyticsSnapshot
+  // Trả về Map<videoId, views>
+  // ────────────────────────────────────────────────────────────────────────────
+  private async batchGetPeriodViews(
+    videoIds: string[],
+    month: number,
+    year: number
+  ): Promise<Map<string, bigint>> {
+    if (videoIds.length === 0) return new Map();
+
+    // Tính startDate/endDate cho tháng
+    const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
+    type Row = { videoId: string; views: bigint };
+    const rows = await db.$queryRaw<Row[]>`
+      SELECT "videoId", views
+      FROM analytics_snapshots
+      WHERE "videoId" = ANY(${videoIds}::text[])
+        AND "startDate" = ${startDate}::date
+        AND date = ${endDate}::date
+    `;
+
+    const map = new Map<string, bigint>();
+    for (const row of rows) {
+      map.set(row.videoId, BigInt(row.views));
+    }
+    return map;
   }
 
-  // Lấy latest views của video
-  private async getLatestViews(videoId: string): Promise<bigint> {
-    const log = await db.videoViewsLog.findFirst({
-      where: { videoId },
-      orderBy: { recordedAt: "desc" },
-      select: { viewsCount: true },
-    });
-    return log?.viewsCount ?? BigInt(0);
+  // ────────────────────────────────────────────────────────────────────────────
+  // Fallback: lấy latest cumulative views từ VideoViewsLog (dùng cho preview
+  // khi chưa có AnalyticsSnapshot cho tháng hiện tại)
+  // ────────────────────────────────────────────────────────────────────────────
+  private async batchGetLatestViews(
+    videoIds: string[]
+  ): Promise<Map<string, bigint>> {
+    if (videoIds.length === 0) return new Map();
+
+    type Row = { videoId: string; viewsCount: bigint };
+    const rows = await db.$queryRaw<Row[]>`
+      SELECT DISTINCT ON ("videoId") "videoId", "viewsCount"
+      FROM video_views_log
+      WHERE "videoId" = ANY(${videoIds}::text[])
+      ORDER BY "videoId", "recordedAt" DESC
+    `;
+
+    const map = new Map<string, bigint>();
+    for (const row of rows) {
+      map.set(row.videoId, BigInt(row.viewsCount));
+    }
+    return map;
   }
 
-  // Tính lương cho 1 nhân sự — lưu vào DB
-  async calculateForUser(
-    userId: string,
-    periodId: string
-  ): Promise<PayrollRecord> {
-    // Lấy user info
-    const user = await db.user.findUniqueOrThrow({
-      where: { id: userId },
-      select: { id: true, name: true, baseSalary: true },
+  // ────────────────────────────────────────────────────────────────────────────
+  // Batch fetch weight configs cho nhiều (channelId, role) cùng lúc
+  // ────────────────────────────────────────────────────────────────────────────
+  private async batchGetWeightConfigs(
+    pairs: Array<{ channelId: string; role: string }>
+  ): Promise<Map<string, Decimal>> {
+    if (pairs.length === 0) return new Map();
+
+    // Unique channel+role pairs
+    const uniqueKeys = new Set(pairs.map((p) => `${p.channelId}:${p.role}`));
+    const uniquePairs = Array.from(uniqueKeys).map((k) => {
+      const [channelId, role] = k.split(":");
+      return { channelId, role };
     });
 
-    // Lấy salary config
-    const salaryConfig = await this.getActiveSalaryConfig(userId);
-    const baseSalary = salaryConfig
-      ? salaryConfig.baseSalary
-      : user.baseSalary;
-    const bonusPerThousandViewsDefault = salaryConfig
-      ? salaryConfig.bonusPerThousandViews
-      : new Decimal(0);
+    const map = new Map<string, Decimal>();
 
-    // Lấy tất cả VideoRoleAssignment status=APPROVED của user
-    // Filter: video.isActive=true, channel.status=ACTIVE
-    const assignments = await db.videoRoleAssignment.findMany({
+    // Fetch tất cả weight configs hiệu lực bằng 1 query
+    type Row = { channelId: string; role: string; weightPercent: Decimal };
+    const rows = await db.$queryRaw<Row[]>`
+      SELECT DISTINCT ON ("channelId", role) "channelId", role::text, "weightPercent"
+      FROM channel_weight_configs
+      WHERE "effectiveFrom" <= NOW()
+      ORDER BY "channelId", role, "effectiveFrom" DESC
+    `;
+
+    for (const row of rows) {
+      map.set(`${row.channelId}:${row.role}`, new Decimal(row.weightPercent.toString()));
+    }
+
+    // Đảm bảo mỗi pair đều có giá trị (default 50)
+    for (const pair of uniquePairs) {
+      const key = `${pair.channelId}:${pair.role}`;
+      if (!map.has(key)) {
+        map.set(key, new Decimal(50));
+      }
+    }
+
+    return map;
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Batch count: bao nhiêu người cùng role trên mỗi video
+  // ────────────────────────────────────────────────────────────────────────────
+  private async batchGetSameRoleCounts(
+    pairs: Array<{ videoId: string; role: string }>
+  ): Promise<Map<string, number>> {
+    if (pairs.length === 0) return new Map();
+
+    type Row = { videoId: string; role: string; cnt: bigint };
+    const rows = await db.$queryRaw<Row[]>`
+      SELECT "videoId", role::text, COUNT(*)::bigint AS cnt
+      FROM video_role_assignments
+      WHERE status = 'APPROVED'
+      GROUP BY "videoId", role
+    `;
+
+    const map = new Map<string, number>();
+    for (const row of rows) {
+      map.set(`${row.videoId}:${row.role}`, Number(row.cnt));
+    }
+    return map;
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Core logic: tính chi tiết bonus cho danh sách assignments
+  // Dùng chung cho cả calculateForUser và preview
+  // ────────────────────────────────────────────────────────────────────────────
+  private async computeDetail(
+    assignments: Assignment[],
+    bonusPerThousandViews: Decimal,
+    month: number,
+    year: number
+  ): Promise<ComputedDetail> {
+    if (assignments.length === 0) {
+      return { detail: [], totalViews: BigInt(0), totalBonus: new Decimal(0) };
+    }
+
+    const videoIds = assignments.map((a) => a.video.id);
+
+    // Batch fetch all data in parallel (thay vì N+1 queries)
+    const [viewsMap, weightMap, roleCountMap] = await Promise.all([
+      this.batchGetPeriodViews(videoIds, month, year).then(async (periodMap) => {
+        // Nếu thiếu views cho một số video, fallback sang cumulative views
+        const missingIds = videoIds.filter((id) => !periodMap.has(id));
+        if (missingIds.length > 0) {
+          const fallbackMap = await this.batchGetLatestViews(missingIds);
+          for (const [id, views] of fallbackMap) {
+            periodMap.set(id, views);
+          }
+        }
+        return periodMap;
+      }),
+      this.batchGetWeightConfigs(
+        assignments.map((a) => ({ channelId: a.video.channelId, role: a.role }))
+      ),
+      this.batchGetSameRoleCounts(
+        assignments.map((a) => ({ videoId: a.video.id, role: a.role }))
+      ),
+    ]);
+
+    const detail: PayrollDetailItem[] = [];
+    let totalViews = BigInt(0);
+    let totalBonus = new Decimal(0);
+
+    for (const assignment of assignments) {
+      const views = viewsMap.get(assignment.video.id) ?? BigInt(0);
+      const weightPercent =
+        weightMap.get(`${assignment.video.channelId}:${assignment.role}`) ?? new Decimal(50);
+      const sameRoleCount =
+        roleCountMap.get(`${assignment.video.id}:${assignment.role}`) ?? 1;
+
+      const effectiveWeight = weightPercent.div(new Decimal(Math.max(1, sameRoleCount)));
+
+      // bonus = (views / 1000) * bonusPerThousandViews * (effectiveWeight / 100)
+      const viewsDecimal = new Decimal(views.toString());
+      const bonus = viewsDecimal
+        .div(new Decimal(1000))
+        .mul(bonusPerThousandViews)
+        .mul(effectiveWeight.div(new Decimal(100)));
+
+      totalViews += views;
+      totalBonus = totalBonus.add(bonus);
+
+      detail.push({
+        videoId: assignment.video.id,
+        videoTitle: assignment.video.title,
+        youtubeVideoId: assignment.video.youtubeVideoId,
+        role: assignment.role,
+        views: Number(views),
+        weightPercent: effectiveWeight.toFixed(2),
+        bonusPerThousandViews: bonusPerThousandViews.toFixed(4),
+        bonus: bonus.toFixed(2),
+      });
+    }
+
+    return { detail, totalViews, totalBonus };
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Fetch approved assignments cho một user
+  // ────────────────────────────────────────────────────────────────────────────
+  private async getApprovedAssignments(userId: string): Promise<Assignment[]> {
+    return db.videoRoleAssignment.findMany({
       where: {
         userId,
         status: "APPROVED",
@@ -99,59 +278,50 @@ export class PayrollCalculator {
         },
       },
     });
+  }
 
-    const detail: PayrollDetailItem[] = [];
-    let totalViews = BigInt(0);
-    let totalBonus = new Decimal(0);
+  // ────────────────────────────────────────────────────────────────────────────
+  // Tính lương cho 1 nhân sự — lưu vào DB
+  // Sử dụng AnalyticsSnapshot (period views) theo tháng của PayrollPeriod
+  // ────────────────────────────────────────────────────────────────────────────
+  async calculateForUser(
+    userId: string,
+    periodId: string
+  ): Promise<PayrollRecord> {
+    // Lấy period month/year
+    const period = await db.payrollPeriod.findUniqueOrThrow({
+      where: { id: periodId },
+      select: { month: true, year: true },
+    });
 
-    for (const assignment of assignments) {
-      const views = await this.getLatestViews(assignment.video.id);
-      const weightConfig = await this.getActiveWeightConfig(
-        assignment.video.channelId,
-        assignment.role
-      );
+    // Lấy user info
+    const user = await db.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { id: true, name: true, baseSalary: true },
+    });
 
-      const weightPercent = weightConfig
-        ? weightConfig.weightPercent
-        : new Decimal(50);
+    // Lấy salary config
+    const salaryConfig = await this.getActiveSalaryConfig(userId);
+    const baseSalary = salaryConfig ? salaryConfig.baseSalary : user.baseSalary;
+    const bonusPerThousandViews = salaryConfig
+      ? salaryConfig.bonusPerThousandViews
+      : new Decimal(0);
 
-      // Count how many approved users share the same role for this video
-      // to divide the role weight equally among them
-      const sameRoleCount = await db.videoRoleAssignment.count({
-        where: {
-          videoId: assignment.video.id,
-          role: assignment.role,
-          status: "APPROVED",
-        },
-      });
-      const effectiveWeight = weightPercent.div(new Decimal(Math.max(1, sameRoleCount)));
+    // Lấy assignments
+    const assignments = await this.getApprovedAssignments(userId);
 
-      // bonus = (views / 1000) * bonusPerThousandViews * (effectiveWeight / 100)
-      const viewsDecimal = new Decimal(views.toString());
-      const bonus = viewsDecimal
-        .div(new Decimal(1000))
-        .mul(bonusPerThousandViewsDefault)
-        .mul(effectiveWeight.div(new Decimal(100)));
-
-      totalViews += views;
-      totalBonus = totalBonus.add(bonus);
-
-      detail.push({
-        videoId: assignment.video.id,
-        videoTitle: assignment.video.title,
-        youtubeVideoId: assignment.video.youtubeVideoId,
-        role: assignment.role,
-        views: Number(views),
-        weightPercent: effectiveWeight.toFixed(2),
-        bonusPerThousandViews: bonusPerThousandViewsDefault.toFixed(4),
-        bonus: bonus.toFixed(2),
-      });
-    }
+    // Tính chi tiết bằng period views (từ AnalyticsSnapshot)
+    const { detail, totalViews, totalBonus } = await this.computeDetail(
+      assignments,
+      bonusPerThousandViews,
+      period.month,
+      period.year
+    );
 
     const totalSalary = baseSalary.add(totalBonus);
     const now = new Date();
 
-    // Upsert PayrollRecord (update nếu đã tồn tại cho periodId+userId)
+    // Upsert PayrollRecord
     const record = await db.payrollRecord.upsert({
       where: { periodId_userId: { periodId, userId } },
       create: {
@@ -177,9 +347,10 @@ export class PayrollCalculator {
     return record;
   }
 
+  // ────────────────────────────────────────────────────────────────────────────
   // Tính lương toàn bộ nhân sự — upsert từng record
+  // ────────────────────────────────────────────────────────────────────────────
   async calculateAll(periodId: string): Promise<PayrollRecord[]> {
-    // Lấy tất cả users có ít nhất 1 APPROVED assignment trong kênh ACTIVE
     const usersWithAssignments = await db.user.findMany({
       where: {
         videoRoleAssignments: {
@@ -211,87 +382,34 @@ export class PayrollCalculator {
     return records;
   }
 
+  // ────────────────────────────────────────────────────────────────────────────
   // Preview lương chưa lưu — dùng cho Staff dashboard
-  async preview(userId: string): Promise<PayrollPreview> {
+  // Dùng tháng hiện tại làm period
+  // ────────────────────────────────────────────────────────────────────────────
+  async preview(userId: string, month?: number, year?: number): Promise<PayrollPreview> {
+    const now = new Date();
+    const m = month ?? now.getMonth() + 1;
+    const y = year ?? now.getFullYear();
+
     const user = await db.user.findUniqueOrThrow({
       where: { id: userId },
       select: { id: true, name: true, baseSalary: true },
     });
 
     const salaryConfig = await this.getActiveSalaryConfig(userId);
-    const baseSalary = salaryConfig
-      ? salaryConfig.baseSalary
-      : user.baseSalary;
-    const bonusPerThousandViewsDefault = salaryConfig
+    const baseSalary = salaryConfig ? salaryConfig.baseSalary : user.baseSalary;
+    const bonusPerThousandViews = salaryConfig
       ? salaryConfig.bonusPerThousandViews
       : new Decimal(0);
 
-    const assignments = await db.videoRoleAssignment.findMany({
-      where: {
-        userId,
-        status: "APPROVED",
-        video: {
-          isActive: true,
-          channel: { status: "ACTIVE" },
-        },
-      },
-      include: {
-        video: {
-          select: {
-            id: true,
-            title: true,
-            youtubeVideoId: true,
-            channelId: true,
-          },
-        },
-      },
-    });
+    const assignments = await this.getApprovedAssignments(userId);
 
-    const detail: PayrollDetailItem[] = [];
-    let totalViews = BigInt(0);
-    let totalBonus = new Decimal(0);
-
-    for (const assignment of assignments) {
-      const views = await this.getLatestViews(assignment.video.id);
-      const weightConfig = await this.getActiveWeightConfig(
-        assignment.video.channelId,
-        assignment.role
-      );
-
-      const weightPercent = weightConfig
-        ? weightConfig.weightPercent
-        : new Decimal(50);
-
-      // Divide role weight by the number of approved users sharing the same role
-      const sameRoleCount = await db.videoRoleAssignment.count({
-        where: {
-          videoId: assignment.video.id,
-          role: assignment.role,
-          status: "APPROVED",
-        },
-      });
-      const effectiveWeight = weightPercent.div(new Decimal(Math.max(1, sameRoleCount)));
-
-      const viewsDecimal = new Decimal(views.toString());
-      const bonus = viewsDecimal
-        .div(new Decimal(1000))
-        .mul(bonusPerThousandViewsDefault)
-        .mul(effectiveWeight.div(new Decimal(100)));
-
-      totalViews += views;
-      totalBonus = totalBonus.add(bonus);
-
-      detail.push({
-        videoId: assignment.video.id,
-        videoTitle: assignment.video.title,
-        youtubeVideoId: assignment.video.youtubeVideoId,
-        role: assignment.role,
-        views: Number(views),
-        weightPercent: effectiveWeight.toFixed(2),
-        bonusPerThousandViews: bonusPerThousandViewsDefault.toFixed(4),
-        bonus: bonus.toFixed(2),
-      });
-    }
+    const { detail, totalViews, totalBonus } = await this.computeDetail(
+      assignments,
+      bonusPerThousandViews,
+      m,
+      y
+    );
 
     const totalSalary = baseSalary.add(totalBonus);
 

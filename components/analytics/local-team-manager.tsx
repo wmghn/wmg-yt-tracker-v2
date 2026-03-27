@@ -246,6 +246,270 @@ function ImportZone({ onImport }: { onImport: (persons: LocalPerson[]) => void }
   );
 }
 
+// ─── Original Excel import (sheet gốc nhân sự) ─────────────────────────────────
+
+interface ParsedAssignment {
+  videoId: string;
+  personName: string;
+  role: "WRITER" | "EDITOR";
+}
+
+/**
+ * Parse file Excel gốc của nhân sự.
+ * Tự động tìm cột "Video ID" và cột chứa tên người làm (có prefix CT/ED).
+ * Trả về danh sách LocalPerson[] đã gom video IDs theo tên + role.
+ */
+function parseOriginalExcel(buffer: ArrayBuffer): { persons: LocalPerson[]; stats: { rows: number; videoIds: number; people: number; skipped: number } } {
+  const wb = XLSX.read(buffer, { type: "array" });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: "" }) as string[][];
+
+  if (rows.length < 2) return { persons: [], stats: { rows: 0, videoIds: 0, people: 0, skipped: 0 } };
+
+  // ── Auto-detect columns ───────────────────────────────────────────────────
+  const headerRow = rows[0].map((h) => String(h).trim().toLowerCase());
+
+  // Find "Video ID" column
+  let videoIdCol = headerRow.findIndex((h) => h === "video id" || h === "videoid" || h === "video_id");
+  if (videoIdCol < 0) videoIdCol = headerRow.findIndex((h) => h.includes("video") && h.includes("id"));
+
+  // Find "Tên Người Làm" / person column — look for header containing "người làm" or "tên người"
+  let personCol = headerRow.findIndex((h) =>
+    h.includes("người làm") || h.includes("tên người") || h.includes("ten nguoi") ||
+    h.includes("assigned") || h.includes("nhân sự") || h.includes("nhan su") ||
+    h.includes("người thực hiện")
+  );
+
+  // Fallback: scan data rows for cells containing CT/ED patterns
+  if (personCol < 0) {
+    for (let c = 0; c < headerRow.length; c++) {
+      if (c === videoIdCol) continue;
+      const sampleValues = rows.slice(1, Math.min(20, rows.length)).map((r) => String(r[c] ?? ""));
+      const hasCTED = sampleValues.some((v) => /\b(CT|ED)\s+\S/i.test(v));
+      if (hasCTED) { personCol = c; break; }
+    }
+  }
+
+  if (videoIdCol < 0 || personCol < 0) {
+    return { persons: [], stats: { rows: rows.length - 1, videoIds: 0, people: 0, skipped: rows.length - 1 } };
+  }
+
+  // ── Parse rows ────────────────────────────────────────────────────────────
+  const assignments: ParsedAssignment[] = [];
+  let skipped = 0;
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const rawVideoId = String(row[videoIdCol] ?? "").trim();
+    const rawPeople = String(row[personCol] ?? "").trim();
+
+    const videoId = extractVideoId(rawVideoId);
+    if (!videoId) { skipped++; continue; }
+
+    if (!rawPeople) { skipped++; continue; }
+
+    // Parse people: "CT Hòa, ED Long, ED Ông" → multiple entries
+    // Split by comma, semicolon, newline, or " - "
+    const parts = rawPeople.split(/[,;\n]+|(?:\s+-\s+)/).map((s) => s.trim()).filter(Boolean);
+
+    for (const part of parts) {
+      // Match prefix: CT/ED (case-insensitive) followed by name
+      const m = part.match(/^(CT|ED|ct|ed|Content|Editor|content|editor)\s+(.+)/i);
+      if (m) {
+        const prefix = m[1].toUpperCase();
+        const name = m[2].trim();
+        const role: "WRITER" | "EDITOR" =
+          prefix === "CT" || prefix === "CONTENT" ? "WRITER" : "EDITOR";
+        assignments.push({ videoId, personName: `${prefix === "CONTENT" ? "CT" : prefix === "EDITOR" ? "ED" : prefix} ${name}`, role });
+      } else {
+        // No prefix — treat as WRITER by default
+        assignments.push({ videoId, personName: part, role: "WRITER" });
+      }
+    }
+  }
+
+  // ── Group by person name + role → LocalPerson[] ───────────────────────────
+  const personMap = new Map<string, LocalPerson>();
+  for (const a of assignments) {
+    const key = `${a.personName}|||${a.role}`;
+    let person = personMap.get(key);
+    if (!person) {
+      person = { id: genId(), name: a.personName, role: a.role, videoIds: [] };
+      personMap.set(key, person);
+    }
+    if (!person.videoIds.includes(a.videoId)) {
+      person.videoIds.push(a.videoId);
+    }
+  }
+
+  const persons = Array.from(personMap.values()).sort((a, b) => a.name.localeCompare(b.name, "vi"));
+  const uniqueVideoIds = new Set(assignments.map((a) => a.videoId));
+
+  return {
+    persons,
+    stats: {
+      rows: rows.length - 1,
+      videoIds: uniqueVideoIds.size,
+      people: persons.length,
+      skipped,
+    },
+  };
+}
+
+/**
+ * Import zone for original Excel file (sheet gốc).
+ * Shows a preview before confirming the import.
+ */
+function OriginalExcelImportZone({ onImport }: { onImport: (persons: LocalPerson[]) => void }) {
+  const [dragging, setDragging] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [preview, setPreview] = useState<{ persons: LocalPerson[]; stats: { rows: number; videoIds: number; people: number; skipped: number } } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function processFile(file: File) {
+    setImporting(true);
+    setError(null);
+    setPreview(null);
+    try {
+      const buffer = await file.arrayBuffer();
+      const result = parseOriginalExcel(buffer);
+      if (result.persons.length === 0) {
+        setError("Không tìm thấy dữ liệu hợp lệ. Đảm bảo file có cột \"Video ID\" và cột chứa tên người làm (CT xxx, ED xxx).");
+        return;
+      }
+      setPreview(result);
+    } catch {
+      setError("Không đọc được file — kiểm tra định dạng .xlsx");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function handleFiles(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    processFile(file);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  function confirmImport() {
+    if (!preview) return;
+    onImport(preview.persons);
+    setPreview(null);
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Drop zone */}
+      {!preview && (
+        <div
+          onClick={() => fileRef.current?.click()}
+          onDragOver={(e: DragEvent<HTMLDivElement>) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e: DragEvent<HTMLDivElement>) => { e.preventDefault(); setDragging(false); handleFiles(e.dataTransfer.files); }}
+          className={`flex items-center gap-3 rounded-xl border-2 border-dashed px-4 py-3.5 cursor-pointer transition-colors ${
+            dragging
+              ? "border-emerald-400 bg-emerald-50"
+              : "border-zinc-300 bg-white hover:border-emerald-300 hover:bg-emerald-50/40"
+          }`}
+        >
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={(e) => handleFiles(e.target.files)}
+          />
+          {importing ? (
+            <RefreshCw className="h-4 w-4 text-emerald-500 animate-spin shrink-0" />
+          ) : (
+            <FileSpreadsheet className="h-4 w-4 text-emerald-500 shrink-0" />
+          )}
+          <span className="text-sm text-zinc-500">
+            Import từ file <span className="font-medium text-zinc-700">Excel gốc</span>{" "}
+            <span className="text-zinc-400">(sheet nhân sự có cột Video ID + Tên Người Làm)</span>{" "}
+            — hoặc kéo thả vào đây
+          </span>
+        </div>
+      )}
+
+      {/* Error */}
+      {error && <p className="text-xs px-1 text-red-600">❌ {error}</p>}
+
+      {/* Preview */}
+      {preview && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-zinc-800">Xem trước kết quả import</h4>
+            <button
+              type="button"
+              onClick={() => setPreview(null)}
+              className="text-zinc-400 hover:text-zinc-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-4 gap-3">
+            <div className="rounded-lg bg-white p-2.5 text-center shadow-sm">
+              <div className="text-lg font-bold text-zinc-900">{preview.stats.rows}</div>
+              <div className="text-xs text-zinc-500">Dòng data</div>
+            </div>
+            <div className="rounded-lg bg-white p-2.5 text-center shadow-sm">
+              <div className="text-lg font-bold text-emerald-600">{preview.stats.videoIds}</div>
+              <div className="text-xs text-zinc-500">Video IDs</div>
+            </div>
+            <div className="rounded-lg bg-white p-2.5 text-center shadow-sm">
+              <div className="text-lg font-bold text-blue-600">{preview.stats.people}</div>
+              <div className="text-xs text-zinc-500">Nhân sự</div>
+            </div>
+            <div className="rounded-lg bg-white p-2.5 text-center shadow-sm">
+              <div className="text-lg font-bold text-zinc-400">{preview.stats.skipped}</div>
+              <div className="text-xs text-zinc-500">Bỏ qua</div>
+            </div>
+          </div>
+
+          {/* Person list preview */}
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {preview.persons.map((p) => (
+              <div key={p.id} className="flex items-center gap-2 rounded-lg bg-white px-3 py-1.5 text-sm">
+                <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-bold ${
+                  p.role === "WRITER" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                }`}>
+                  {p.role === "WRITER" ? "CT" : "ED"}
+                </span>
+                <span className="font-medium text-zinc-800">{p.name}</span>
+                <span className="text-zinc-400 text-xs ml-auto">{p.videoIds.length} videos</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 pt-1">
+            <Button
+              onClick={confirmImport}
+              size="sm"
+              className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              Xác nhận import {preview.persons.length} nhân sự
+            </Button>
+            <Button
+              onClick={() => setPreview(null)}
+              size="sm"
+              variant="outline"
+            >
+              Huỷ
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Analytics calculation ──────────────────────────────────────────────────────
 
 function computeSummaries(
@@ -736,7 +1000,8 @@ export function LocalTeamManager({
       .catch(() => {});
   }, [channelId]);
 
-  // Fetch view counts whenever persons or dateRange changes
+  // Fetch view counts whenever persons or dateRange changes.
+  // Batches requests in groups of 200 IDs (API limit).
   const fetchViews = useCallback((ps: LocalPerson[], dr: DateRangeValue) => {
     if (fetchTimer.current) clearTimeout(fetchTimer.current);
     const allIds = Array.from(new Set(ps.flatMap((p) => p.videoIds)));
@@ -745,15 +1010,29 @@ export function LocalTeamManager({
     fetchTimer.current = setTimeout(async () => {
       setFetchingViews(true);
       try {
-        const params = new URLSearchParams({ ids: allIds.join(","), dateRange: dr.type });
-        if (channelId) params.set("channelId", channelId);
-        if (dr.month) params.set("month", String(dr.month));
-        if (dr.year)  params.set("year",  String(dr.year));
-        const res = await fetch(`/api/videos/views-lookup?${params}`);
-        if (!res.ok) return;
-        const json = await res.json();
+        const BATCH_SIZE = 200;
+        const batches: string[][] = [];
+        for (let i = 0; i < allIds.length; i += BATCH_SIZE) {
+          batches.push(allIds.slice(i, i + BATCH_SIZE));
+        }
+
+        const results = await Promise.all(
+          batches.map(async (batchIds) => {
+            const params = new URLSearchParams({ ids: batchIds.join(","), dateRange: dr.type });
+            if (channelId) params.set("channelId", channelId);
+            if (dr.month) params.set("month", String(dr.month));
+            if (dr.year)  params.set("year",  String(dr.year));
+            const res = await fetch(`/api/videos/views-lookup?${params}`);
+            if (!res.ok) return [];
+            const json = await res.json();
+            return (json.videos ?? []) as VideoViewData[];
+          })
+        );
+
         const map = new Map<string, VideoViewData>();
-        for (const v of json.videos ?? []) map.set(v.youtubeVideoId, v);
+        for (const batch of results) {
+          for (const v of batch) map.set(v.youtubeVideoId, v);
+        }
         setViewMap(map);
       } catch { /* non-fatal */ } finally {
         setFetchingViews(false);
@@ -883,8 +1162,9 @@ export function LocalTeamManager({
       {/* ── Manage tab ── */}
       {activeTab === "manage" && (
         <div className="space-y-4">
-          {/* Import zone */}
+          {/* Import zones */}
           <ImportZone onImport={handleImport} />
+          <OriginalExcelImportZone onImport={handleImport} />
 
           {/* Person cards */}
           {persons.length > 0 && (

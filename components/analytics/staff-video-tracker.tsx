@@ -108,7 +108,8 @@ export function StaffVideoTracker({ channelId }: Props) {
       .catch(() => {});
   }, [channelId]);
 
-  // Fetch views from DB whenever ids or dateRange change
+  // Fetch views from DB whenever ids or dateRange change.
+  // Batches requests in groups of 200 IDs (API limit).
   const fetchViews = useCallback((ids: string[], dr: DateRangeValue) => {
     if (fetchTimer.current) clearTimeout(fetchTimer.current);
     if (ids.length === 0) { setViewMap(new Map()); return; }
@@ -116,14 +117,28 @@ export function StaffVideoTracker({ channelId }: Props) {
     fetchTimer.current = setTimeout(async () => {
       setFetching(true);
       try {
-        const params = new URLSearchParams({ ids: ids.join(","), dateRange: dr.type });
-        if (dr.month) params.set("month", String(dr.month));
-        if (dr.year) params.set("year", String(dr.year));
-        const res = await fetch(`/api/videos/views-lookup?${params}`);
-        if (!res.ok) return;
-        const json = await res.json();
+        const BATCH_SIZE = 200;
+        const batches: string[][] = [];
+        for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+          batches.push(ids.slice(i, i + BATCH_SIZE));
+        }
+
+        const results = await Promise.all(
+          batches.map(async (batchIds) => {
+            const params = new URLSearchParams({ ids: batchIds.join(","), dateRange: dr.type });
+            if (dr.month) params.set("month", String(dr.month));
+            if (dr.year) params.set("year", String(dr.year));
+            const res = await fetch(`/api/videos/views-lookup?${params}`);
+            if (!res.ok) return [];
+            const json = await res.json();
+            return (json.videos ?? []) as VideoViewData[];
+          })
+        );
+
         const map = new Map<string, VideoViewData>();
-        for (const v of json.videos ?? []) map.set(v.youtubeVideoId, v);
+        for (const batch of results) {
+          for (const v of batch) map.set(v.youtubeVideoId, v);
+        }
         setViewMap(map);
       } catch { /* non-fatal */ } finally {
         setFetching(false);

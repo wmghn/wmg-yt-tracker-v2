@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { viewsSnapshotService } from "@/lib/payroll/snapshot";
+import { safeCompare } from "@/lib/crypto";
 
 /**
  * GET /api/cron/sync-views
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
     ? authHeader.slice(7)
     : authHeader;
 
-  if (!cronSecret || token !== cronSecret) {
+  if (!cronSecret || !safeCompare(token, cronSecret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

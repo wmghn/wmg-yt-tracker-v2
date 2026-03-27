@@ -18,7 +18,14 @@ export interface DateRange {
 
 export function resolveDateRange(type: DateRangeType, month?: number, year?: number): DateRange {
   const today = new Date();
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  // Format as YYYY-MM-DD using LOCAL timezone (not UTC).
+  // toISOString() returns UTC which shifts dates by -1 day in UTC+ timezones.
+  const fmt = (d: Date) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
 
   if (type === "7days") {
     const from = new Date(today);
@@ -141,7 +148,10 @@ export class YouTubeAnalyticsAPI {
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
 
-      if (!res.ok) return [];
+      if (!res.ok) {
+        console.warn(`[YouTubeAnalyticsAPI.getVideoMetrics] API error ${res.status} for video ${youtubeVideoId}`);
+        return [];
+      }
 
       const data = await res.json();
       const colHeaders: string[] = (data.columnHeaders ?? []).map((h: { name: string }) => h.name);
@@ -159,7 +169,8 @@ export class YouTubeAnalyticsAPI {
         });
         return entry;
       });
-    } catch {
+    } catch (err) {
+      console.error(`[YouTubeAnalyticsAPI.getVideoMetrics] Error for video ${youtubeVideoId}:`, err);
       return [];
     }
   }

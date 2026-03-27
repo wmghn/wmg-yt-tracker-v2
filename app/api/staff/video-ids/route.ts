@@ -194,42 +194,42 @@ export async function POST(req: Request) {
       created++;
     }
 
-    // Upsert VideoRoleAssignment for all valid IDs with the selected role
-    // unique key: (videoId, userId, role)
-    const allVideoIds: string[] = [];
-    for (const ytId of validIds) {
-      type VRow = { id: string };
-      const rows = await db.$queryRaw<VRow[]>`
-        SELECT id FROM videos
-        WHERE "youtubeVideoId" = ${ytId}
-          AND "channelId" = ${channelId}
-        LIMIT 1`;
-      if (rows.length > 0) allVideoIds.push(rows[0].id);
-    }
+    // Batch fetch all video internal IDs for valid YouTube IDs (replaces N+1 loop)
+    type VRow = { id: string; youtubeVideoId: string };
+    const videoRows = await db.$queryRaw<VRow[]>`
+      SELECT id, "youtubeVideoId" FROM videos
+      WHERE "youtubeVideoId" = ANY(${validIds}::text[])
+        AND "channelId" = ${channelId}`;
+    const allVideoIds = videoRows.map((r) => r.id);
 
-    for (const videoId of allVideoIds) {
+    // Batch upsert role assignments for current user
+    if (allVideoIds.length > 0) {
       await db.$executeRaw`
         INSERT INTO video_role_assignments (id, "videoId", "userId", role, status, "createdAt")
-        VALUES (gen_random_uuid(), ${videoId}, ${userId}, ${role}::"VideoRole", 'PENDING', NOW())
+        SELECT gen_random_uuid(), vid, ${userId}, ${role}::"VideoRole", 'PENDING', NOW()
+        FROM unnest(${allVideoIds}::text[]) AS vid
         ON CONFLICT ("videoId", "userId", role) DO NOTHING`;
     }
 
-    // Create assignments for co-workers (must be channel members)
+    // Batch create assignments for co-workers (must be channel members)
     if (coWorkerIds.length > 0 && allVideoIds.length > 0) {
-      for (const cwId of coWorkerIds) {
-        if (cwId === userId) continue; // skip self
-        // Validate co-worker is a channel member
-        type CwRow = { id: string };
-        const cwMember = await db.$queryRaw<CwRow[]>`
-          SELECT id FROM channel_members
-          WHERE "channelId" = ${channelId} AND "userId" = ${cwId}
-          LIMIT 1`;
-        if (cwMember.length === 0) continue;
+      // Batch validate co-worker membership (replaces N+1 loop)
+      const validCoWorkerIds = coWorkerIds.filter((id) => id !== userId);
+      if (validCoWorkerIds.length > 0) {
+        type CwRow = { userId: string };
+        const validMembers = await db.$queryRaw<CwRow[]>`
+          SELECT "userId" FROM channel_members
+          WHERE "channelId" = ${channelId}
+            AND "userId" = ANY(${validCoWorkerIds}::text[])`;
+        const validMemberIds = validMembers.map((r) => r.userId);
 
-        for (const videoId of allVideoIds) {
+        // Batch insert for all valid co-workers × all videos
+        if (validMemberIds.length > 0) {
           await db.$executeRaw`
             INSERT INTO video_role_assignments (id, "videoId", "userId", role, status, "createdAt")
-            VALUES (gen_random_uuid(), ${videoId}, ${cwId}, ${role}::"VideoRole", 'PENDING', NOW())
+            SELECT gen_random_uuid(), vid, cw, ${role}::"VideoRole", 'PENDING', NOW()
+            FROM unnest(${allVideoIds}::text[]) AS vid
+            CROSS JOIN unnest(${validMemberIds}::text[]) AS cw
             ON CONFLICT ("videoId", "userId", role) DO NOTHING`;
         }
       }

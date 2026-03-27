@@ -183,7 +183,7 @@ model VideoViewsLog {
   // Relations
   video Video @relation(fields: [videoId], references: [id])
 
-  @@index([videoId])
+  @@index([videoId, recordedAt(sort: Desc)]) // compound index cho "latest views per video" query
   @@index([recordedAt])
   @@map("video_views_log")
 }
@@ -202,7 +202,7 @@ model ChannelWeightConfig {
   creator User    @relation("WeightConfigCreator", fields: [createdBy], references: [id])
 
   @@unique([channelId, role, effectiveFrom])
-  @@index([channelId])
+  @@index([channelId, role, effectiveFrom(sort: Desc)]) // compound index cho batch weight config lookup
   @@map("channel_weight_configs")
 }
 
@@ -299,8 +299,7 @@ model AnalyticsSnapshot {
 
   @@unique([videoId, startDate, date])
   @@index([videoId])
-  @@index([date])
-  @@index([startDate])
+  @@index([startDate, date]) // compound index cho range queries (thay thế 2 index riêng)
   @@map("analytics_snapshots")
 }
 

@@ -55,7 +55,10 @@ async function refreshAccessToken(tokenId: string, refreshToken: string): Promis
       }),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`[refreshAccessToken] Google token refresh failed: ${res.status}`);
+      return null;
+    }
 
     const data = await res.json();
     const newAccessToken: string = data.access_token;
@@ -68,7 +71,8 @@ async function refreshAccessToken(tokenId: string, refreshToken: string): Promis
     });
 
     return newAccessToken;
-  } catch {
+  } catch (err) {
+    console.error(`[refreshAccessToken] Error refreshing token ${tokenId}:`, err);
     return null;
   }
 }

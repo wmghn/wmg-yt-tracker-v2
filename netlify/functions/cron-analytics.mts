@@ -113,12 +113,39 @@ export default async function handler() {
     return new Response("skipped:no_channels", { status: 200 });
   }
 
+  // ── Acquire lock — prevent overlapping runs ────────────────────────────────
+  // Check if another sync is currently in progress (SyncJob with status
+  // "running" or "pending" created within the last 10 minutes). If so, skip.
+  const recentRunning = await db.syncJob.findFirst({
+    where: {
+      status: { in: ["running", "pending"] },
+      createdAt: { gt: new Date(now.getTime() - 10 * 60 * 1000) },
+    },
+  });
+
+  if (recentRunning) {
+    console.log(`[cron-analytics] Another sync is running (job ${recentRunning.id}, started ${recentRunning.createdAt.toISOString()}) — skip`);
+    await saveLog({ status: "skipped", skipReason: `Sync khác đang chạy (job ${recentRunning.id})` });
+    return new Response("skipped:locked", { status: 200 });
+  }
+
+  // Create a SyncJob to act as a lock
+  const lockJob = await db.syncJob.create({
+    data: {
+      status: "running",
+      channelIds,
+      dateRange: config.dateRange,
+      month: config.dateRange === "month" ? now.getUTCMonth() + 1 : null,
+      year: config.dateRange === "month" ? now.getUTCFullYear() : null,
+    },
+  });
+
   // ── Resolve date range ──────────────────────────────────────────────────────
   const rangeType = (config.dateRange === "month" ? "month" : config.dateRange) as DateRangeType;
   const month = config.dateRange === "month" ? now.getUTCMonth() + 1 : undefined;
   const year  = config.dateRange === "month" ? now.getUTCFullYear() : undefined;
 
-  // ── Run sync ────────────────────────────────────────────────────────────────
+  // ── Run sync (channels are staggered internally with 5s delay) ─────────────
   console.log(`[cron-analytics] Starting sync: ${channelIds.length} channels, range=${config.dateRange}`);
   const startMs = Date.now();
 
@@ -136,8 +163,15 @@ export default async function handler() {
 
   const durationMs = Date.now() - startMs;
 
-  // ── Persist result + save log ───────────────────────────────────────────────
+  // ── Release lock + persist result + save log ──────────────────────────────
   await Promise.all([
+    db.syncJob.update({
+      where: { id: lockJob.id },
+      data: {
+        status: result.errors.length > 0 ? "error" : "done",
+        result: result as unknown as Record<string, unknown>,
+      },
+    }),
     db.cronConfig.upsert({
       where: { id: "singleton" },
       create: {

@@ -19,8 +19,10 @@ export async function POST() {
 
     const config = await db.cronConfig.findUnique({ where: { id: "singleton" } });
     const dateRange = (config?.dateRange ?? "month") as DateRangeType;
-    const month = dateRange === "month" ? now.getUTCMonth() + 1 : undefined;
-    const year  = dateRange === "month" ? now.getUTCFullYear() : undefined;
+    // Use local timezone (not UTC) to match resolveDateRange behavior.
+    // UTC would give wrong month at start of month in UTC+ timezones.
+    const month = dateRange === "month" ? now.getMonth() + 1 : undefined;
+    const year  = dateRange === "month" ? now.getFullYear() : undefined;
 
     // Lấy danh sách kênh được bật
     const [allChannels, channelConfigs] = await Promise.all([
@@ -31,6 +33,32 @@ export async function POST() {
       channelConfigs.filter((c) => !c.enabled).map((c) => c.channelId)
     );
     const channelIds = allChannels.map((c) => c.id).filter((id) => !disabledSet.has(id));
+
+    // ── Lock: check if another sync is already running ──────────────────────
+    const recentRunning = await db.syncJob.findFirst({
+      where: {
+        status: { in: ["running", "pending"] },
+        createdAt: { gt: new Date(now.getTime() - 10 * 60 * 1000) },
+      },
+    });
+
+    if (recentRunning) {
+      return NextResponse.json(
+        { error: `Sync đang chạy (job ${recentRunning.id}). Vui lòng đợi hoàn tất.` },
+        { status: 409 }
+      );
+    }
+
+    // Create lock job
+    const lockJob = await db.syncJob.create({
+      data: {
+        status: "running",
+        channelIds,
+        dateRange,
+        month: month ?? null,
+        year: year ?? null,
+      },
+    });
 
     const startMs = Date.now();
     let result;
@@ -47,6 +75,14 @@ export async function POST() {
     const durationMs = Date.now() - startMs;
 
     await Promise.all([
+      // Release lock
+      db.syncJob.update({
+        where: { id: lockJob.id },
+        data: {
+          status: result.errors.length > 0 ? "error" : "done",
+          result: JSON.parse(JSON.stringify(result)),
+        },
+      }),
       db.cronConfig.upsert({
         where: { id: "singleton" },
         create: {

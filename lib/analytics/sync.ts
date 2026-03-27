@@ -10,6 +10,9 @@ export interface SyncResult {
   errors: string[];
 }
 
+/** Delay helper — wait `ms` milliseconds between channels to avoid YouTube API rate limits */
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
  * Syncs YouTube Analytics data into AnalyticsSnapshot.
  *
@@ -34,7 +37,6 @@ export async function syncAnalyticsSnapshots(
 
   const dateRange = resolveDateRange(rangeType, month, year);
   const snapshotStartDate = dateRange.startDate; // YYYY-MM-DD (range start)
-  const snapshotDate = new Date(dateRange.endDate); // range end
 
   const channels = await db.channel.findMany({
     where: {
@@ -52,7 +54,16 @@ export async function syncAnalyticsSnapshots(
     return result;
   }
 
-  for (const channel of channels) {
+  for (let idx = 0; idx < channels.length; idx++) {
+    const channel = channels[idx];
+
+    // Stagger: wait 5 seconds between channels to avoid YouTube API rate limits.
+    // Skip delay for the first channel.
+    if (idx > 0) {
+      console.log(`[syncAnalyticsSnapshots] Waiting 5s before channel "${channel.name}" (${idx + 1}/${channels.length})…`);
+      await delay(5_000);
+    }
+
     const accessToken = await getValidAccessToken(channel.id);
     if (!accessToken) {
       result.errors.push(`Kênh "${channel.name}": không lấy được access token.`);
@@ -79,25 +90,12 @@ export async function syncAnalyticsSnapshots(
       });
       const ytToInternal = new Map(existingVideos.map((v) => [v.youtubeVideoId, v.id]));
 
-      // Fetch YouTube metadata for ALL video IDs in this sync batch
-      // — creates new records for unknowns AND updates title/thumbnail for existing ones
+      // Fetch YouTube metadata ONLY for unknown video IDs (saves API quota)
       const missingYtIds = ytIds.filter((id) => !ytToInternal.has(id));
-      const allMetadata = await fetchVideoMetadataBatch(ytIds);
-      const metaMap = new Map(allMetadata.map((m) => [m.youtubeVideoId, m]));
-
-      // Update existing video titles/thumbnails
-      for (const [ytId, internalId] of Array.from(ytToInternal.entries())) {
-        const meta = metaMap.get(ytId);
-        if (!meta) continue;
-        try {
-          await db.$executeRaw`
-            UPDATE videos
-            SET title = ${meta.title},
-                "thumbnailUrl" = ${meta.thumbnailUrl ?? null},
-                "updatedAt" = NOW()
-            WHERE id = ${internalId}`;
-        } catch { /* non-fatal */ }
-      }
+      const missingMetadata = missingYtIds.length > 0
+        ? await fetchVideoMetadataBatch(missingYtIds)
+        : [];
+      const metaMap = new Map(missingMetadata.map((m) => [m.youtubeVideoId, m]));
 
       // Create new Video records for unknown videos
       if (missingYtIds.length > 0) {
@@ -117,7 +115,9 @@ export async function syncAnalyticsSnapshots(
               },
             });
             ytToInternal.set(meta.youtubeVideoId, created.id);
-          } catch { /* skip individual failures */ }
+          } catch (err) {
+            console.error(`[syncAnalyticsSnapshots] Failed to upsert video "${ytId}":`, err);
+          }
         }
       }
 
@@ -125,7 +125,7 @@ export async function syncAnalyticsSnapshots(
       // Unique key is (videoId, startDate, date) so "7 days" and "28 days"
       // synced on the same day are stored separately and never overwrite each other.
       const startDateStr = snapshotStartDate; // YYYY-MM-DD
-      const dateStr = snapshotDate.toISOString().slice(0, 10); // YYYY-MM-DD (endDate)
+      const dateStr = dateRange.endDate;      // YYYY-MM-DD (use string directly, avoid toISOString UTC shift)
 
       for (const row of rows) {
         const internalId = ytToInternal.get(row.ytVideoId);

@@ -93,9 +93,13 @@ function exportViewsXlsx(videos: TopVideo[], label: string) {
 }
 
 function parseDateRange(params: URLSearchParams): DateRangeValue {
-  const type = (params.get("dateRange") ?? "28days") as DateRangeType;
-  const month = params.get("month") ? Number(params.get("month")) : undefined;
-  const year = params.get("year") ? Number(params.get("year")) : undefined;
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+
+  const type = (params.get("dateRange") ?? "month") as DateRangeType;
+  const month = params.get("month") ? Number(params.get("month")) : (type === "month" ? currentMonth : undefined);
+  const year = params.get("year") ? Number(params.get("year")) : (type === "month" ? currentYear : undefined);
   const { label } = resolveDateRange(type, month, year);
   return { type, month, year, label };
 }
@@ -202,15 +206,14 @@ function DirectorAnalyticsContent() {
 
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-2">
-        {data && data.channels.length > 1 && (
-          <ChannelDropdown
-            channels={data.channels}
-            value={selectedChannel}
-            onChange={handleChannelChange}
-          />
-        )}
-
         <div className="flex items-center gap-2 ml-auto">
+          {data && data.channels.length > 1 && (
+            <ChannelDropdown
+              channels={data.channels}
+              value={selectedChannel}
+              onChange={handleChannelChange}
+            />
+          )}
           <DateRangeDropdown value={dateRange} onChange={handleDateRangeChange} />
           <SyncButton
             channelId={selectedChannel || undefined}
