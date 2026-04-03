@@ -136,14 +136,23 @@ export function CronSettings() {
   }
 
   async function toggleChannel(channelId: string, enabled: boolean) {
+    // Optimistic update
     setChannels((prev) =>
       prev.map((c) => (c.id === channelId ? { ...c, enabled } : c))
     );
-    await fetch("/api/admin/cron/channels", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channelId, enabled }),
-    });
+    try {
+      const res = await fetch("/api/admin/cron/channels", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channelId, enabled }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch {
+      // Revert on failure
+      setChannels((prev) =>
+        prev.map((c) => (c.id === channelId ? { ...c, enabled: !enabled } : c))
+      );
+    }
   }
 
   if (loading) {
@@ -312,7 +321,11 @@ export function CronSettings() {
             <div className="flex gap-2 ml-auto">
               <button
                 type="button"
-                onClick={() => channels.forEach((c) => !c.enabled && toggleChannel(c.id, true))}
+                onClick={async () => {
+                  for (const c of channels) {
+                    if (!c.enabled) await toggleChannel(c.id, true);
+                  }
+                }}
                 className="text-xs text-blue-600 hover:underline"
               >
                 Bật tất cả
@@ -320,7 +333,11 @@ export function CronSettings() {
               <span className="text-zinc-300">·</span>
               <button
                 type="button"
-                onClick={() => channels.forEach((c) => c.enabled && toggleChannel(c.id, false))}
+                onClick={async () => {
+                  for (const c of channels) {
+                    if (c.enabled) await toggleChannel(c.id, false);
+                  }
+                }}
                 className="text-xs text-zinc-500 hover:underline"
               >
                 Tắt tất cả
