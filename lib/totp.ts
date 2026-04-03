@@ -1,7 +1,7 @@
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
 
-const APP_NAME = "YT Payroll";
+const APP_NAME = "WMG YT View Tracker";
 
 /** Tạo secret mới và trả về base32 string */
 export function generateTOTPSecret(): string {

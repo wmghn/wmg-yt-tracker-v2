@@ -72,7 +72,7 @@ export function Sidebar({ user }: Props) {
       <div className="flex h-16 items-center gap-2 border-b px-5">
         <div className="flex items-center gap-2 text-red-600">
           <Youtube className="h-6 w-6" />
-          <span className="font-bold text-lg text-zinc-900">YT Payroll</span>
+          <span className="font-bold text-lg text-zinc-900">WMG YT View Tracker</span>
         </div>
       </div>
 

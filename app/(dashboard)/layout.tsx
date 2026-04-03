@@ -31,7 +31,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <MobileNav user={user} />
           <div className="flex items-center gap-2 text-red-600">
             <Youtube className="h-5 w-5" />
-            <span className="font-bold text-zinc-900">YT Payroll</span>
+            <span className="font-bold text-zinc-900">WMG YT View Tracker</span>
           </div>
         </header>
 

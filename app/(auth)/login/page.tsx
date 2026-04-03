@@ -114,7 +114,7 @@ export default function LoginPage() {
         <div className="flex justify-center mb-4">
           <div className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-xl">
             <Youtube className="h-6 w-6" />
-            <span className="font-bold text-lg">YT Payroll</span>
+            <span className="font-bold text-lg">WMG YT View Tracker</span>
           </div>
         </div>
         <CardTitle className="text-2xl">Đăng nhập</CardTitle>

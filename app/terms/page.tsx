@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Youtube, ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Điều khoản Dịch vụ – YT Payroll Platform",
+  title: "Điều khoản Dịch vụ – WMG YT View Tracker",
 };
 
 export default function TermsPage() {
@@ -14,7 +14,7 @@ export default function TermsPage() {
         <div className="mx-auto max-w-3xl flex items-center justify-between px-6 py-4">
           <Link href="/login" className="flex items-center gap-2 text-red-600">
             <Youtube className="h-5 w-5" />
-            <span className="font-bold text-zinc-900">YT Payroll</span>
+            <span className="font-bold text-zinc-900">WMG YT View Tracker</span>
           </Link>
           <Link
             href="/login"
@@ -41,7 +41,7 @@ export default function TermsPage() {
               1. Chấp nhận Điều khoản
             </h2>
             <p>
-              Bằng việc truy cập và sử dụng YT Payroll Platform
+              Bằng việc truy cập và sử dụng WMG YT View Tracker
               (&quot;Nền tảng&quot;), bạn đồng ý tuân thủ các điều khoản dịch
               vụ này. Nếu bạn không đồng ý, vui lòng không sử dụng Nền tảng.
             </p>

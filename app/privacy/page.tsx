@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Youtube, ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Chính sách Bảo mật – YT Payroll Platform",
+  title: "Chính sách Bảo mật – WMG YT View Tracker",
 };
 
 export default function PrivacyPage() {
@@ -14,7 +14,7 @@ export default function PrivacyPage() {
         <div className="mx-auto max-w-3xl flex items-center justify-between px-6 py-4">
           <Link href="/login" className="flex items-center gap-2 text-red-600">
             <Youtube className="h-5 w-5" />
-            <span className="font-bold text-zinc-900">YT Payroll</span>
+            <span className="font-bold text-zinc-900">WMG YT View Tracker</span>
           </Link>
           <Link
             href="/login"
@@ -41,7 +41,7 @@ export default function PrivacyPage() {
               1. Giới thiệu
             </h2>
             <p>
-              YT Payroll Platform (&quot;Nền tảng&quot;) được vận hành bởi WMG
+              WMG YT View Tracker (&quot;Nền tảng&quot;) được vận hành bởi WMG
               Media. Chúng tôi cam kết bảo vệ quyền riêng tư của bạn. Chính
               sách này giải thích cách chúng tôi thu thập, sử dụng và bảo vệ
               thông tin cá nhân khi bạn sử dụng Nền tảng.
