@@ -5,16 +5,21 @@ import type { DateRangeType } from "../../lib/youtube/analytics-api";
 
 /**
  * Netlify Scheduled Function — analytics cron job.
- * Fires every hour, but reads CronConfig from DB to decide whether to actually run.
+ * Fires every 5 minutes, but reads CronConfig from DB to decide whether to actually run.
  *
  * Logic:
  *   1. Reads global CronConfig (enabled, frequency, runHour, dateRange)
  *   2. If disabled → skip
- *   3. If current UTC hour ≠ runHour → skip
- *   4. If lastRunAt is too recent for the configured frequency → skip
- *   5. Reads CronChannelConfig to determine which channels to sync (default: all enabled)
- *   6. Runs syncAnalyticsSnapshots for enabled channels
- *   7. Updates lastRunAt + lastResult
+ *   3. Test frequencies (every5min, every30min, hourly):
+ *      - Global frequency gate (lastRunAt on CronConfig)
+ *      - Runs all enabled channels together
+ *   4. Production frequencies (daily, every2days, weekly):
+ *      - Channels are staggered 1 hour apart
+ *      - Channel at index i (sorted by ID) runs at (runHour + i) % 24 UTC
+ *      - Per-channel frequency gate (lastRunAt on CronChannelConfig)
+ *      - Each cron invocation runs only the channel(s) due at the current hour
+ *   5. Runs syncAnalyticsSnapshots for eligible channels
+ *   6. Updates per-channel lastRunAt + global lastRunAt + log
  */
 async function saveLog(params: {
   status: "success" | "error" | "skipped";
@@ -45,7 +50,6 @@ export default async function handler() {
   // ── Read global config ──────────────────────────────────────────────────────
   let config = await db.cronConfig.findUnique({ where: { id: "singleton" } });
 
-  // Use defaults if config not yet created
   if (!config) {
     config = {
       id: "singleton",
@@ -65,7 +69,7 @@ export default async function handler() {
     return new Response("skipped:disabled", { status: 200 });
   }
 
-  // ── Check frequency (min hours between runs) ────────────────────────────────
+  // ── Frequency config ────────────────────────────────────────────────────────
   const TEST_FREQUENCIES = new Set(["every5min", "every30min", "hourly"]);
   const isTestFrequency = TEST_FREQUENCIES.has(config.frequency);
 
@@ -81,13 +85,8 @@ export default async function handler() {
   };
   const minHours = minHoursMap[config.frequency] ?? 20;
 
-  // ── Check hour (only for non-test frequencies) ──────────────────────────────
-  if (!isTestFrequency && utcHour !== config.runHour) {
-    console.log(`[cron-analytics] UTC hour ${utcHour} ≠ configured ${config.runHour} — skip`);
-    return new Response("skipped:wrong_hour", { status: 200 });
-  }
-
-  if (config.lastRunAt) {
+  // ── Test frequencies: global frequency gate (all channels run together) ─────
+  if (isTestFrequency && config.lastRunAt) {
     const hoursSince = (now.getTime() - new Date(config.lastRunAt).getTime()) / 3_600_000;
     if (hoursSince < minHours) {
       console.log(`[cron-analytics] Last run ${hoursSince.toFixed(1)}h ago < ${minHours}h — skip`);
@@ -96,26 +95,66 @@ export default async function handler() {
     }
   }
 
-  // ── Determine which channels to sync ───────────────────────────────────────
+  // ── Load channels + per-channel config ─────────────────────────────────────
   const [allChannels, channelConfigs] = await Promise.all([
     db.channel.findMany({ where: { status: "ACTIVE" }, select: { id: true } }),
-    db.cronChannelConfig.findMany({ select: { channelId: true, enabled: true } }),
+    db.cronChannelConfig.findMany({ select: { channelId: true, enabled: true, lastRunAt: true } }),
   ]);
 
+  const configMap = new Map(channelConfigs.map((c) => [c.channelId, c]));
   const disabledSet = new Set(
     channelConfigs.filter((c) => !c.enabled).map((c) => c.channelId)
   );
-  const channelIds = allChannels.map((c) => c.id).filter((id) => !disabledSet.has(id));
 
-  if (channelIds.length === 0) {
+  // Sort by ID for stable, consistent channel ordering
+  const enabledChannelIds = allChannels
+    .map((c) => c.id)
+    .filter((id) => !disabledSet.has(id))
+    .sort();
+
+  if (enabledChannelIds.length === 0) {
     console.log("[cron-analytics] No enabled channels — skip");
     await saveLog({ status: "skipped", skipReason: "Không có kênh nào được bật" });
     return new Response("skipped:no_channels", { status: 200 });
   }
 
+  // ── Determine which channels are eligible this invocation ──────────────────
+  let channelIds: string[];
+
+  if (isTestFrequency) {
+    // Test mode: run all enabled channels (global frequency gate already passed above)
+    channelIds = enabledChannelIds;
+  } else {
+    // Production mode: stagger channels 1 hour apart.
+    // Channel at index i (0-based, sorted by ID) targets UTC hour = (runHour + i) % 24.
+    // Each channel also has its own per-channel frequency gate.
+    channelIds = [];
+    for (let i = 0; i < enabledChannelIds.length; i++) {
+      const channelId = enabledChannelIds[i];
+      const targetHour = (config.runHour + i) % 24;
+
+      if (utcHour !== targetHour) continue;
+
+      const chConfig = configMap.get(channelId);
+      const chLastRunAt = chConfig?.lastRunAt ?? null;
+      if (chLastRunAt) {
+        const hoursSince = (now.getTime() - new Date(chLastRunAt).getTime()) / 3_600_000;
+        if (hoursSince < minHours) {
+          console.log(`[cron-analytics] Channel ${channelId} ran ${hoursSince.toFixed(1)}h ago < ${minHours}h — skip`);
+          continue;
+        }
+      }
+
+      channelIds.push(channelId);
+    }
+
+    if (channelIds.length === 0) {
+      console.log(`[cron-analytics] No channels due at UTC hour ${utcHour} — skip`);
+      return new Response("skipped:wrong_hour", { status: 200 });
+    }
+  }
+
   // ── Acquire lock — prevent overlapping runs ────────────────────────────────
-  // Check if another sync is currently in progress (SyncJob with status
-  // "running" or "pending" created within the last 10 minutes). If so, skip.
   const recentRunning = await db.syncJob.findFirst({
     where: {
       status: { in: ["running", "pending"] },
@@ -124,7 +163,7 @@ export default async function handler() {
   });
 
   if (recentRunning) {
-    console.log(`[cron-analytics] Another sync is running (job ${recentRunning.id}, started ${recentRunning.createdAt.toISOString()}) — skip`);
+    console.log(`[cron-analytics] Another sync is running (job ${recentRunning.id}) — skip`);
     await saveLog({ status: "skipped", skipReason: `Sync khác đang chạy (job ${recentRunning.id})` });
     return new Response("skipped:locked", { status: 200 });
   }
@@ -145,8 +184,8 @@ export default async function handler() {
   const month = config.dateRange === "month" ? now.getUTCMonth() + 1 : undefined;
   const year  = config.dateRange === "month" ? now.getUTCFullYear() : undefined;
 
-  // ── Run sync (channels are staggered internally with 5s delay) ─────────────
-  console.log(`[cron-analytics] Starting sync: ${channelIds.length} channels, range=${config.dateRange}`);
+  // ── Run sync ────────────────────────────────────────────────────────────────
+  console.log(`[cron-analytics] Starting sync: ${channelIds.length} channel(s), range=${config.dateRange}, UTC hour=${utcHour}`);
   const startMs = Date.now();
 
   let result;
@@ -163,7 +202,20 @@ export default async function handler() {
 
   const durationMs = Date.now() - startMs;
 
-  // ── Release lock + persist result + save log ──────────────────────────────
+  // ── Update per-channel lastRunAt (production mode only) ────────────────────
+  if (!isTestFrequency) {
+    await Promise.all(
+      channelIds.map((channelId) =>
+        db.cronChannelConfig.upsert({
+          where: { channelId },
+          create: { channelId, enabled: true, lastRunAt: now },
+          update: { lastRunAt: now },
+        })
+      )
+    );
+  }
+
+  // ── Release lock + persist global result + save log ──────────────────────
   await Promise.all([
     db.syncJob.update({
       where: { id: lockJob.id },
@@ -204,7 +256,7 @@ export default async function handler() {
 
 // Fire every 5 minutes — DB config decides whether to actually run.
 // Test frequencies (every5min, every30min, hourly) rely on this interval.
-// Production frequencies (daily, every2days, weekly) use the runHour gate above.
+// Production frequencies (daily, every2days, weekly) use the per-channel runHour gate.
 export const config: Config = {
   schedule: "*/5 * * * *",
 };

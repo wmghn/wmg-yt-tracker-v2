@@ -56,7 +56,10 @@ async function refreshAccessToken(tokenId: string, refreshToken: string): Promis
     });
 
     if (!res.ok) {
-      console.error(`[refreshAccessToken] Google token refresh failed: ${res.status}`);
+      const errorBody = await res.text().catch(() => "(could not read body)");
+      console.error(
+        `[refreshAccessToken] Google token refresh failed: ${res.status} — ${errorBody}`
+      );
       return null;
     }
 

@@ -349,10 +349,11 @@ model CronConfig {
 
 // Bật/tắt cron per-channel
 model CronChannelConfig {
-  id        String   @id @default(uuid())
-  channelId String   @unique
-  enabled   Boolean  @default(true)
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(uuid())
+  channelId String    @unique
+  enabled   Boolean   @default(true)
+  lastRunAt DateTime?                    // lần cuối kênh này được cron sync
+  updatedAt DateTime  @updatedAt
 
   channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 

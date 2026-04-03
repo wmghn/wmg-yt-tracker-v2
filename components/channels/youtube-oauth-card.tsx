@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Youtube, CheckCircle2, XCircle, ExternalLink, Trash2, AlertTriangle } from "lucide-react";
+import { Youtube, CheckCircle2, XCircle, ExternalLink, Trash2, AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Props {
@@ -41,6 +41,8 @@ export function YoutubeOAuthCard({
 }: Props) {
   const router = useRouter();
   const [disconnecting, setDisconnecting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshResult, setRefreshResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [origin, setOrigin] = useState("");
 
   useEffect(() => { setOrigin(window.location.origin); }, []);
@@ -53,6 +55,27 @@ export function YoutubeOAuthCard({
       router.refresh();
     } finally {
       setDisconnecting(false);
+    }
+  }
+
+  async function handleRefreshToken() {
+    setRefreshing(true);
+    setRefreshResult(null);
+    try {
+      const res = await fetch(`/api/channels/${channelId}/oauth/refresh`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRefreshResult({ ok: true, message: data.message });
+        router.refresh();
+      } else {
+        setRefreshResult({ ok: false, message: data.error ?? "Không thể làm mới token" });
+      }
+    } catch {
+      setRefreshResult({ ok: false, message: "Lỗi kết nối. Hãy thử lại." });
+    } finally {
+      setRefreshing(false);
     }
   }
 
@@ -74,6 +97,24 @@ export function YoutubeOAuthCard({
         <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {/* Refresh result banner */}
+      {refreshResult && (
+        <div
+          className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm ${
+            refreshResult.ok
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {refreshResult.ok ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+          )}
+          <span>{refreshResult.message}</span>
         </div>
       )}
 
@@ -103,16 +144,28 @@ export function YoutubeOAuthCard({
           </div>
 
           {isConnected ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDisconnect}
-              disabled={disconnecting}
-              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-            >
-              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-              {disconnecting ? "Đang ngắt..." : "Ngắt kết nối"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefreshToken}
+                disabled={refreshing || disconnecting}
+                className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? "animate-spin" : ""}`} />
+                {refreshing ? "Đang làm mới..." : "Làm mới token"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDisconnect}
+                disabled={disconnecting || refreshing}
+                className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                {disconnecting ? "Đang ngắt..." : "Ngắt kết nối"}
+              </Button>
+            </div>
           ) : (
             <Button asChild size="sm" className="bg-red-600 hover:bg-red-700 text-white">
               <a href={`/api/channels/${channelId}/oauth`}>
